@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>제05장 | 메모리 벡터 검색</title>
+<style>
+:root{--ink:#171922;--paper:#f1f2ee;--purple:#4836b4;--line:#dadcd8;--muted:#5a6070;--soft:#efecfb}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);color:var(--ink);font-family:"Noto Sans KR","Malgun Gothic",system-ui,sans-serif;line-height:1.75}.hero{background:#171922;color:#fff;padding:65px max(24px,calc((100vw - 1180px)/2));background-image:linear-gradient(90deg,#ffffff0a 1px,transparent 1px),linear-gradient(#ffffff0a 1px,transparent 1px);background-size:28px 28px}.kicker{color:#ffd34f;font-weight:700}.hero h1{font-size:clamp(2rem,4.5vw,3.5rem);line-height:1.2;margin:12px 0}.hero p{max-width:760px;color:#c7c9d1}.chips{display:flex;flex-wrap:wrap;gap:9px}.chip{border:1px solid #666;padding:4px 11px;font-size:.85rem}.layout{max-width:1180px;margin:auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:40px;padding:32px 24px 70px}nav{position:sticky;top:16px;align-self:start}nav a{display:block;color:#4c5160;text-decoration:none;padding:5px 10px;border-left:2px solid #ddd;font-size:.9rem}nav a:hover{border-color:var(--purple);color:var(--purple)}section{background:white;border:1px solid var(--line);padding:30px 36px;margin-bottom:18px;scroll-margin-top:20px}h2{font-size:1.38rem;line-height:1.4;margin:0 0 14px}.num{color:var(--purple);background:var(--soft);padding:3px 9px;margin-right:10px;font-size:.9rem}h3{margin:23px 0 8px;font-size:1.06rem}p,li{color:#454b58}table{border-collapse:collapse;width:100%;font-size:.92rem}th,td{border-bottom:1px solid #ddd;padding:10px;text-align:left;vertical-align:top}th{background:#f5f5f2}.diagram{border:1px solid #d9d5ee;background:#faf9ff;padding:18px;overflow:auto}.diagram svg{width:100%;height:auto;min-width:570px}.code{border:1px solid #ddd;margin:18px 0;background:#fbfbf9}.bar{display:flex;justify-content:space-between;background:#efefeb;border-bottom:1px solid #ddd;padding:8px 12px;font-size:.82rem}.bar button{border:1px solid #bcbcc5;background:white;padding:3px 9px;cursor:pointer}pre{white-space:pre;overflow:auto;margin:0;padding:18px 20px;font: .88rem/1.8 "DejaVu Sans Mono",monospace}.output{border:1px solid #ddd;background:#f6f6f3;padding:15px 18px;margin-top:-18px;overflow:auto}.output strong{display:block;color:#21764c;font-size:.82rem;margin-bottom:8px}.explain{border-left:3px solid var(--purple);padding:10px 16px;background:#f7f6fc;margin:14px 0 20px}.note{background:#f1effb;border:1px solid #d8d2f2;padding:13px 17px}.warn{background:#fff5e8;border:1px solid #efdbbb;padding:13px 17px}.summary{background:#171922;color:white}.summary p,.summary li{color:#e1e2e8}code{background:#f2f2ef;padding:1px 4px}footer{max-width:1180px;margin:auto;padding:0 24px 50px;color:#666}@media(max-width:850px){.layout{display:block}nav{position:static;margin-bottom:22px}section{padding:23px 19px}.hero{padding:48px 22px}}
+</style></head><body>
+<header class="hero"><div class="kicker">SPRING AI · VECTOR SEARCH · CHAPTER 05</div><h1>메모리 벡터 검색<br>직접 구현하기</h1><p>제03장의 코사인 유사도와 제04장의 Ollama 임베딩을 연결합니다. 문장을 숫자 벡터로 변환하고, 메모리에 저장한 뒤 질문과 의미가 가까운 문서를 검색합니다.</p><div class="chips"><span class="chip">60분 실습</span><span class="chip">Ubuntu 24.04</span><span class="chip">IntelliJ · Java 21</span><span class="chip">Ollama bge-m3</span><span class="chip">외부 DB 불필요</span></div></header>
+<div class="layout"><nav aria-label="목차"><strong>목차</strong><a href="#s0">00 배경 개념</a><a href="#s1">01 과제 개요</a><a href="#s2">02 입출력과 구조</a><a href="#s3">03 준비 및 확인</a><a href="#s4">04 프로젝트 생성</a><a href="#s5">05 전체 Java 코드</a><a href="#s6">06 실행과 예상 출력</a><a href="#s7">07 코드 풀이</a><a href="#s8">08 검색 품질 확인</a><a href="#s9">09 오류 점검</a><a href="#s10">10 핵심 정리</a></nav>
+<main>
+<section id="s0"><h2><span class="num">00</span>배경 개념 — 검색은 어떻게 이루어지는가</h2><p><b>Embedding(임베딩, 문장을 숫자 벡터로 변환)</b>을 사용하면 글자 그대로 일치하지 않아도 의미가 비슷한 문장을 찾을 수 있습니다. <b>Cosine Similarity(코사인 유사도, 벡터 방향의 유사성)</b>는 두 벡터의 내적을 길이의 곱으로 나눈 값입니다.</p><div class="note"><b>기본 개념:</b> 문서와 질문은 반드시 <b>같은 임베딩 모델</b>로 변환해야 합니다. 임베딩 벡터는 저장할 수 있지만, 메모리 저장소는 프로그램 종료 시 사라집니다.</div><p>제05장은 Spring AI의 데이터 저장소 연동에 앞서, 핵심 검색 알고리즘을 <b>순수 Java + Ollama HTTP API</b>로 직접 확인하는 단계입니다. Spring AI의 VectorStore(벡터 스토어, 벡터 저장소 추상화)는 제06장 이후 비교합니다.</p></section>
+<section id="s1"><h2><span class="num">01</span>과제 개요 · 60분 배분</h2><table><tr><th>시간</th><th>작업</th><th>산출물</th></tr><tr><td>0~10분</td><td>Ollama 서버·모델 확인</td><td>임베딩 API 정상 응답</td></tr><tr><td>10~20분</td><td>IntelliJ Java 프로젝트 준비</td><td>Java 21 실행 환경</td></tr><tr><td>20~40분</td><td>문서 임베딩·저장·Top-K 검색 코드 작성</td><td>실행 가능한 Main.java</td></tr><tr><td>40~50분</td><td>검색 결과 비교</td><td>질문별 상위 3개 문서</td></tr><tr><td>50~60분</td><td>오류·한계·확장 정리</td><td>검증표</td></tr></table><p><b>입력:</b> 예제 문서 5개, 한국어 질문 1개, Ollama의 <code>bge-m3</code> 모델. <b>출력:</b> 유사도 순으로 정렬된 상위 3개 문서와 점수. <b>추가 기능:</b> 같은 문서가 여러 번 입력되더라도 질문을 매번 임베딩하여 검색할 수 있도록 문서 벡터를 최초 1회만 생성합니다.</p></section>
+<section id="s2"><h2><span class="num">02</span>전체 동작 구조</h2><div class="diagram"><svg viewBox="0 0 780 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="문서 임베딩과 질문 검색 흐름"><defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto"><path d="M0 0L7 3L0 6" fill="none" stroke="#4836b4" stroke-width="1.5"/></marker></defs><rect x="10" y="15" width="760" height="123" rx="9" fill="#f3f0ff" stroke="#c4b8f1"/><text x="26" y="36" font-size="16" font-weight="bold" fill="#34278c">문서 적재 (프로그램 시작 시 1회)</text><g fill="white" stroke="#9d93cc" stroke-width="1.5"><rect x="25" y="59" width="140" height="52" rx="6"/><rect x="237" y="59" width="150" height="52" rx="6"/><rect x="461" y="59" width="140" height="52" rx="6"/></g><g font-size="14" fill="#222" text-anchor="middle"><text x="95" y="81">문서 5개</text><text x="95" y="99">String</text><text x="312" y="81">Ollama</text><text x="312" y="99">bge-m3</text><text x="531" y="81">메모리 저장</text><text x="531" y="99">List&lt;Entry&gt;</text></g><g stroke="#4836b4" stroke-width="2" marker-end="url(#arr)"><path d="M165 85H233"/><path d="M387 85H457"/></g><rect x="10" y="158" width="760" height="127" rx="9" fill="#f3f8ff" stroke="#b7cce9"/><text x="26" y="180" font-size="16" font-weight="bold" fill="#244c87">질문 검색 (요청할 때마다)</text><g fill="white" stroke="#95b1d4" stroke-width="1.5"><rect x="25" y="201" width="125" height="53" rx="6"/><rect x="206" y="201" width="135" height="53" rx="6"/><rect x="400" y="201" width="155" height="53" rx="6"/><rect x="608" y="201" width="146" height="53" rx="6"/></g><g font-size="13" fill="#222" text-anchor="middle"><text x="87" y="223">질문</text><text x="87" y="241">String</text><text x="273" y="223">Ollama</text><text x="273" y="241">질문 임베딩</text><text x="477" y="223">코사인 유사도</text><text x="477" y="241">전체 문서 비교</text><text x="681" y="223">점수 내림차순</text><text x="681" y="241">Top-3</text></g><g stroke="#4836b4" stroke-width="2" marker-end="url(#arr)"><path d="M150 227H202"/><path d="M341 227H396"/><path d="M555 227H604"/></g><path d="M531 111V147H477V197" fill="none" stroke="#4836b4" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arr)"/></svg></div><p><b>핵심:</b> 검색 엔진이 아니라 메모리 리스트에 문서 벡터를 보관합니다. 점수 계산은 Java 코드에서 수행합니다. DB에 영구 저장하는 기능은 제06장에 추가합니다.</p></section>
+<section id="s3"><h2><span class="num">03</span>실습 준비 — Ollama 확인</h2><div class="code"><div class="bar">Ubuntu 터미널 <button onclick="copyCode(this)">복사</button></div><pre><code># 설치된 Java 확인
+java -version
+
+# Ollama 서버 확인
+curl -s http://localhost:11434/api/tags
+
+# 필요한 임베딩 모델 설치
+ollama pull bge-m3
+
+# 임베딩 생성 확인
+curl -s http://localhost:11434/api/embed \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"bge-m3","input":"벡터 검색 테스트"}'</code></pre></div><div class="output"><strong>예상 출력 (실제 PC 실행 미검증)</strong><pre>{"embeddings":[[0.01,-0.02,...]]}</pre></div><div class="explain"><b>코드 풀이 — 이 명령이 무엇을 하는가</b><p><code>/api/embed</code>는 텍스트를 벡터로 변환합니다. 응답의 <code>embeddings</code>는 입력 문장별 벡터 배열입니다. 수치와 길이는 모델·버전에 따라 확인합니다. 벡터 값 자체는 고정 정답이 아닙니다.</p></div></section>
+<section id="s4"><h2><span class="num">04</span>IntelliJ 프로젝트 생성</h2><ol><li><b>New Project → Java</b>를 선택합니다.</li><li><b>JDK 21</b>을 선택하고 프로젝트명을 <code>ch05-memory-vector-search</code>로 설정합니다.</li><li>Build System은 <b>Gradle</b>을 선택합니다. 이 장의 코드는 Java 표준 라이브러리만 사용하므로 외부 라이브러리 의존성이 없습니다.</li><li><code>src/main/java/Main.java</code>에 아래 전체 코드를 입력합니다. 생성된 패키지 선언이 있다면 파일 경로와 선언을 일치시킵니다.</li><li>IntelliJ 실행 버튼으로 <code>Main.main()</code>을 실행합니다.</li></ol><div class="note">Java 21의 <code>java.net.http.HttpClient</code>를 사용합니다. Spring Boot 프로젝트를 새로 만들 필요는 없습니다. 본 장은 Spring AI 벡터 검색 동작 원리 확인용 독립 실습입니다.</div></section>
+<section id="s5"><h2><span class="num">05</span>전체 Java 코드 — Main.java</h2><p>외부 JSON 라이브러리를 사용하지 않기 위해 Ollama의 <code>/api/embed</code> 응답에서 <b>숫자 배열 부분만 엄격하게 추출</b>합니다. 실제 서비스에서는 Jackson 등 검증된 JSON 라이브러리를 사용해야 합니다.</p><div class="code"><div class="bar">src/main/java/Main.java <button onclick="copyCode(this)">복사</button></div><pre><code>import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+public class Main {
+    // Ollama 임베딩 API 및 모델명
+    private static final URI API =
+        URI.create("http://localhost:11434/api/embed");
+    private static final String MODEL = "bge-m3";
+
+    // 문서와 벡터를 함께 보관하는 불변 레코드
+    record Entry(String text, double[] vector) {}
+    record Result(String text, double score) {}
+
+    private static final HttpClient HTTP = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5)).build();
+
+    public static void main(String[] args) throws Exception {
+        // (추가) 검색 대상 문서 5개
+        List&lt;String&gt; documents = List.of(
+            "전기회로에서 저항은 전류의 흐름을 제한한다.",
+            "커패시터는 전하를 저장하는 전자부품이다.",
+            "UART는 비동기 직렬 통신 방식이다.",
+            "FPGA는 디지털 회로를 재구성할 수 있다.",
+            "RAG는 문서를 검색하여 언어 모델 답변에 활용한다."
+        );
+
+        // (추가) 최초 한 번만 문서 임베딩 생성
+        List&lt;Entry&gt; memory = new ArrayList&lt;&gt;();
+        for (String doc : documents) {
+            memory.add(new Entry(doc, embed(doc)));
+        }
+        System.out.println("문서 적재: " + memory.size() + "개");
+
+        // (추가) 질문 임베딩 → 전체 문서 점수 계산
+        String question = "직렬 통신은 어떤 방식인가?";
+        double[] queryVector = embed(question);
+        List&lt;Result&gt; results = new ArrayList&lt;&gt;();
+
+        for (Entry entry : memory) {
+            double score = cosine(queryVector, entry.vector());
+            results.add(new Result(entry.text(), score));
+        }
+
+        // (추가) 유사도 높은 순으로 정렬하고 상위 3개 출력
+        results.sort(Comparator.comparingDouble(Result::score).reversed());
+        System.out.println("질문: " + question);
+        for (int i = 0; i &lt; Math.min(3, results.size()); i++) {
+            Result result = results.get(i);
+            System.out.printf("%d위 | %.4f | %s%n",
+                i + 1, result.score(), result.text());
+        }
+    }
+
+    // 텍스트 → Ollama 임베딩 벡터
+    static double[] embed(String input) throws Exception {
+        // JSON 문자열 안의 따옴표, 역슬래시, 제어문자 이스케이프
+        String json = "{\"model\":\"" + MODEL +
+            "\",\"input\":\"" + escapeJson(input) + "\"}";
+        HttpRequest request = HttpRequest.newBuilder(API)
+            .timeout(Duration.ofSeconds(120))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(
+                json, StandardCharsets.UTF_8)).build();
+
+        HttpResponse&lt;String&gt; response = HTTP.send(request,
+            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+        if (response.statusCode() != 200) {
+            throw new IllegalStateException(
+                "Ollama HTTP " + response.statusCode()
+                + ": " + response.body());
+        }
+        return parseFirstVector(response.body());
+    }
+
+    static String escapeJson(String value) {
+        StringBuilder out = new StringBuilder();
+        for (char ch : value.toCharArray()) {
+            switch (ch) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (ch &lt; 0x20) {
+                        out.append(String.format("\\u%04x", (int) ch));
+                    } else out.append(ch);
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    // /api/embed 응답의 embeddings 첫 번째 배열을 파싱
+    // 교육용 숫자 배열 파서: 일반 JSON 파서 대체 용도 아님
+    static double[] parseFirstVector(String json) {
+        int key = json.indexOf("\"embeddings\"");
+        if (key &lt; 0) throw new IllegalArgumentException("embeddings 없음");
+        int outer = json.indexOf('[', key);
+        int start = json.indexOf('[', outer + 1);
+        int end = json.indexOf(']', start + 1);
+        if (outer &lt; 0 || start &lt; 0 || end &lt; 0)
+            throw new IllegalArgumentException("벡터 배열 형식 오류");
+        String[] tokens = json.substring(start + 1, end).split(",");
+        if (tokens.length == 0 || tokens[0].isBlank())
+            throw new IllegalArgumentException("빈 벡터");
+        double[] vector = new double[tokens.length];
+        for (int i = 0; i &lt; tokens.length; i++)
+            vector[i] = Double.parseDouble(tokens[i].trim());
+        return vector;
+    }
+
+    // 두 벡터의 방향 유사성 계산
+    static double cosine(double[] a, double[] b) {
+        if (a.length != b.length || a.length == 0)
+            throw new IllegalArgumentException("벡터 차원 불일치");
+        double dot = 0, normA = 0, normB = 0;
+        for (int i = 0; i &lt; a.length; i++) {
+            dot += a[i] * b[i];
+            normA += a[i] * a[i];
+            normB += b[i] * b[i];
+        }
+        if (normA == 0 || normB == 0)
+            throw new IllegalArgumentException("영벡터");
+        return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+    }
+}</code></pre></div><div class="warn"><b>주의:</b> 위 코드는 교육 목적의 최소 구현입니다. 서버 응답 JSON을 문자열 위치로 읽는 방법은 응답 형식 변화에 취약하므로 실제 Spring AI 서비스에서는 JSON 역직렬화와 예외 처리를 사용합니다. 문서가 수백만 건이면 전체 순회 검색 대신 벡터 인덱스가 필요합니다.</div></section>
+<section id="s6"><h2><span class="num">06</span>실행과 예상 출력</h2><div class="output"><strong>예상 출력 예시 — 점수·순위는 실제 실행 전 미확정</strong><pre>문서 적재: 5개
+질문: 직렬 통신은 어떤 방식인가?
+1위 | (실행 시 계산) | UART는 비동기 직렬 통신 방식이다.
+2위 | (실행 시 계산) | ...
+3위 | (실행 시 계산) | ...</pre></div><p>가장 관련성이 높은 문서로 UART 문장이 선택될 것으로 기대할 수 있으나, <b>정확한 순위는 모델 출력으로 확인</b>해야 합니다. 실험 결과를 미리 확정하지 않습니다.</p></section>
+<section id="s7"><h2><span class="num">07</span>코드 풀이 — 왜 이렇게 작성했는가</h2><table><tr><th>코드</th><th>역할</th><th>의도</th></tr><tr><td><code>record Entry</code></td><td>문서·벡터 쌍 보관</td><td>문서와 임베딩의 연결 유지</td></tr><tr><td><code>embed(doc)</code></td><td>문서 임베딩 생성</td><td>동일 모델의 벡터 공간에 저장</td></tr><tr><td><code>embed(question)</code></td><td>질문 임베딩 생성</td><td>문서와 직접 비교 가능</td></tr><tr><td><code>cosine(a,b)</code></td><td>내적 ÷ 벡터 길이의 곱</td><td>방향 유사도 계산</td></tr><tr><td><code>sort(...reversed())</code></td><td>점수 내림차순 정렬</td><td>가장 가까운 문서 우선 출력</td></tr><tr><td><code>Math.min(3,...)</code></td><td>상위 3개 출력</td><td>문서 수가 3개 미만이어도 안전</td></tr></table><div class="explain"><b>계산의 의미</b><p>두 벡터가 같은 방향이면 코사인 유사도는 1에 가깝고, 직교하면 0에 가깝습니다. 임베딩 모델의 의미적 유사도는 이 점수만으로 정답을 보장하지 않습니다. 검색 정확도는 실제 질문·문서 집합으로 평가해야 합니다.</p></div></section>
+<section id="s8"><h2><span class="num">08</span>실습 검증 및 확장</h2><ol><li>질문을 <code>"전류를 제한하는 부품은?"</code>으로 변경하고 저항 문서의 순위를 기록합니다.</li><li>질문을 <code>"문서를 이용하여 AI가 답하는 기술은?"</code>로 변경하고 RAG 문서의 순위를 기록합니다.</li><li>문서에 <code>"SPI는 동기식 직렬 통신이다."</code>를 추가하고 UART 질문의 검색 순위를 비교합니다.</li><li>Ollama를 중지한 뒤 오류 메시지를 확인하고 다시 실행합니다.</li><li>프로그램을 재시작하면 메모리 벡터가 다시 만들어지는지 확인합니다.</li></ol><table><tr><th>검증 항목</th><th>기대 결과</th><th>실제 결과</th></tr><tr><td>문서 적재</td><td>5개(확장 전)</td><td>미검증</td></tr><tr><td>벡터 차원</td><td>같은 모델이면 동일 차원</td><td>미검증</td></tr><tr><td>Top-K</td><td>최대 3개, 내림차순</td><td>미검증</td></tr><tr><td>서버 중단</td><td>접속 실패 예외 발생</td><td>미검증</td></tr><tr><td>재실행</td><td>문서 재임베딩</td><td>미검증</td></tr></table></section>
+<section id="s9"><h2><span class="num">09</span>오류 점검</h2><table><tr><th>증상</th><th>원인 및 점검</th></tr><tr><td>Connection refused</td><td><code>systemctl status ollama</code> 및 11434 포트 확인</td></tr><tr><td>model not found</td><td><code>ollama list</code>, <code>ollama pull bge-m3</code></td></tr><tr><td>HTTP 500 / 시간 초과</td><td>서버 로그, RAM·GPU 메모리 및 모델 로딩 시간 확인</td></tr><tr><td>벡터 차원 불일치</td><td>문서와 질문에 동일 모델을 사용했는지 확인</td></tr><tr><td>문서 순위가 기대와 다름</td><td>질문 표현·문서 내용·모델의 검색 품질 비교</td></tr><tr><td>Java 컴파일 오류</td><td>JDK 21 및 Main.java 전체 복사 상태 확인</td></tr></table><div class="warn">개인정보·토큰·사용자 PC 경로·내부 네트워크 주소는 공개 저장소에 게시하지 않습니다. 예제의 <code>localhost</code>는 사용자 PC 내부 서비스만 가리킵니다.</div></section>
+<section class="summary" id="s10"><h2><span class="num">10</span>핵심 정리</h2><p>메모리 벡터 검색은 <b>문서 임베딩 → 메모리 저장 → 질문 임베딩 → 코사인 유사도 → 상위 K개 반환</b>의 흐름으로 구현합니다. 이 장에서는 실제 벡터 DB나 Spring AI 추상화 없이 검색 원리를 확인합니다.</p><p><b>다음 장:</b> 제06장 — PostgreSQL과 pgvector를 Docker로 실행하고, 메모리 대신 DB에 벡터를 영구 저장합니다.</p><p><b>검증 상태:</b> 교육용 코드·문서 작성 완료 / Ubuntu 실제 실행 미검증.</p></section>
+</main></div><footer>SPRING AI RAG LAB · CHAPTER 05 · 학습안내서 / 예상 결과는 실제 실행 결과가 아닙니다.</footer>
+<script>function copyCode(btn){const txt=btn.closest(".code").querySelector("code").innerText;navigator.clipboard.writeText(txt).then(()=>{btn.textContent="복사됨";setTimeout(()=>btn.textContent="복사",1500)})}</script>
+</body></html>
