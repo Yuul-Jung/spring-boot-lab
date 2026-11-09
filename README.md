@@ -9,13 +9,14 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 ## 학습안내서
 
 - [제01장 — 전체 학습 테크트리 및 Ubuntu 개발환경 구축](docs/ch01_ubuntu_development_environment.md)
+- [제02장 — IntelliJ에서 Spring Boot + Spring AI 시작 (HTML)](docs/ch02_spring_boot_spring_ai.html)
 
 ## 과정 목차
 
 | 장 | 주제 | 상태 |
 |---:|---|---|
 | 01 | 전체 학습 테크트리 및 Ubuntu 개발환경 구축 | **안내서 작성** |
-| 02 | Spring Boot 프로젝트 구성과 Spring AI 연결 | 예정 |
+| 02 | Spring Boot 프로젝트 구성과 Spring AI 연결 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 03 | 벡터·임베딩·코사인 유사도 | 예정 |
 | 04 | Ollama 로컬 LLM과 임베딩 모델 | 예정 |
 | 05 | 메모리 벡터 검색 | 예정 |
