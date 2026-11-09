@@ -1,0 +1,99 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제08장 | Elasticsearch 벡터·하이브리드 검색</title><style>:root{--paper:#f1f2ee;--ink:#171922;--accent:#4836b4;--line:#dcddd8}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);font-family:"Noto Sans KR",system-ui,sans-serif;color:var(--ink);line-height:1.75}.hero{background:#171922;color:white;padding:68px max(24px,calc((100vw - 1160px)/2));background-image:linear-gradient(90deg,#ffffff0a 1px,transparent 1px),linear-gradient(#ffffff0a 1px,transparent 1px);background-size:28px 28px}.hero .k{color:#ffd34f;font-weight:700}.hero h1{font-size:clamp(2.1rem,4.5vw,3.5rem);line-height:1.18;margin:16px 0}.hero p{color:#cbd0d9;max-width:760px}.chips span{display:inline-block;border:1px solid #737782;padding:4px 12px;margin:8px 6px 0 0}.layout{max-width:1160px;margin:auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:36px;padding:30px 22px 70px}nav{position:sticky;top:16px;align-self:start;max-height:95vh;overflow:auto}nav h2{font-size:.83rem;color:#777}nav a{display:block;padding:6px 8px;border-left:2px solid transparent;text-decoration:none;color:#515664;font-size:.88rem}nav a:hover{border-color:var(--accent);color:var(--accent)}section{background:white;border:1px solid var(--line);padding:28px 34px;margin-bottom:17px;scroll-margin-top:20px}section h2{font-size:1.42rem;margin:0 0 18px}section h2 span{font-size:.88rem;background:#eeebfa;color:var(--accent);padding:4px 9px;margin-right:12px}p{color:#404650}table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.93rem}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#f6f6f3}code,pre{font-family:ui-monospace,Consolas,monospace}p code,td code{background:#f1f0ed;padding:2px 4px}.code{border:1px solid var(--line);margin:20px 0;background:#fafaf8}.bar{background:#eeeee9;padding:9px 14px;font-size:.82rem;color:var(--accent);font-weight:700;display:flex;justify-content:space-between}.bar button{cursor:pointer;border:1px solid #c9c6e5;background:white;padding:3px 12px}.code pre{margin:0;padding:18px;overflow:auto;font-size:.83rem;line-height:1.75}.output{background:#eef5ef;border:1px solid #c9e0cf;padding:12px 18px;margin-top:-10px}.output pre{white-space:pre-wrap;overflow-wrap:anywhere}.explain{border-left:3px solid var(--accent);padding:9px 16px;background:#f6f4fd}.diagram{padding:26px;background:#f8f8f6;border:1px solid var(--line);text-align:center}.box{border:2px solid #bab7d7;background:white;padding:12px 20px;max-width:440px;margin:auto;font-weight:600}.box small{font-weight:400}.box.accent{background:#ece9fc;border-color:var(--accent)}.down{color:var(--accent);font-size:1.7rem}.split{display:flex;gap:20px;justify-content:center}.split .box{flex:1}@media(max-width:900px){.layout{display:block}nav{position:static;max-height:none;margin-bottom:20px}section{padding:23px 18px}.hero{padding:50px 22px}.split{flex-direction:column}}</style></head><body><header class="hero"><div class="k">SPRING AI · VECTOR DB · RAG / CHAPTER 08</div><h1>Elasticsearch<br>벡터·하이브리드 검색</h1><p>제07장의 키워드 검색을 확장해 벡터 유사도와 RRF 순위 결합까지 실습합니다. 코드 → 예상 출력 → 해설 순서로 따라 합니다.</p><div class="chips"><span>60분</span><span>Ubuntu 24.04</span><span>Elasticsearch 8.17.8</span><span>BM25 · kNN · RRF</span></div></header><div class="layout"><nav><h2>목차</h2><a href="#s0">00　개요·입출력 정의</a><a href="#s1">01　전체 구조</a><a href="#s2">02　60분 진행표</a><a href="#s3">03　실행 환경 확인</a><a href="#s4">04　인덱스 매핑 생성</a><a href="#s5">05　문서 4개 색인</a><a href="#s6">06　BM25 키워드 검색</a><a href="#s7">07　kNN 벡터 검색</a><a href="#s8">08　Python RRF 통합 실습</a><a href="#s9">09　검색 비교·해석</a><a href="#s10">10　검증·오류 점검</a><a href="#s11">11　핵심 정리·다음 장</a></nav><main><section id="s0"><h2><span>00</span>개요·입출력 정의</h2><p>제07장의 <b>Elasticsearch(엘라스틱서치, 검색 엔진)</b> 키워드 검색을 확장하여 <b>벡터 검색</b>과 <b>Hybrid Search(하이브리드 서치, 혼합 검색)</b>를 비교합니다. 검색 입력은 질문 문자열, 출력은 문서 ID·점수·제목입니다.</p><table><tr><th>입력</th><td>검색어, 3차원 실습용 벡터, 문서 4개</td></tr><tr><th>출력</th><td>BM25(비엠25, 키워드 관련도)·kNN(케이엔엔, 최근접 이웃)·RRF(알알에프, 순위 융합) 결과</td></tr><tr><th>완료 기준</th><td>세 방식의 검색 결과를 비교하고 순위가 다른 이유를 설명한다.</td></tr></table></section><section id="s1"><h2><span>01</span>전체 구조</h2><div class="diagram"><div class="box">사용자 질문</div><div class="down">↓</div><div class="split"><div class="box">키워드 경로<br><small>match → BM25</small></div><div class="box">의미 경로<br><small>임베딩 → kNN</small></div></div><div class="down">↓</div><div class="box accent">RRF 순위 결합</div><div class="down">↓</div><div class="box">검색 결과 Top-K → 다음 장 문서 적재·RAG</div></div><p>BM25는 단어 일치와 빈도를, kNN은 벡터의 가까움을 이용합니다. RRF는 두 결과의 <b>순위</b>를 결합하므로 점수 단위가 달라도 적용할 수 있습니다.</p></section><section id="s2"><h2><span>02</span>60분 진행표</h2><table><tr><th>시간</th><th>실습</th><th>확인</th></tr><tr><td>0~10분</td><td>기존 Elasticsearch 확인</td><td>서버 응답</td></tr><tr><td>10~25분</td><td>dense_vector 매핑·문서 색인</td><td>4개 문서 저장</td></tr><tr><td>25~35분</td><td>BM25 키워드 검색</td><td>점수와 순위</td></tr><tr><td>35~45분</td><td>kNN 벡터 검색</td><td>벡터 순위</td></tr><tr><td>45~55분</td><td>RRF 혼합 검색</td><td>두 결과 결합</td></tr><tr><td>55~60분</td><td>검증·정리</td><td>비교표 작성</td></tr></table></section><section id="s3"><h2><span>03</span>실행 환경 확인</h2><p>제07장에서 사용한 Elasticsearch 8.17.8 컨테이너를 그대로 활용합니다. 이 장에서는 버전 의존성이 큰 서버 내장 RRF API 대신 <b>Python 표준 라이브러리로 클라이언트 측 RRF</b>를 구현합니다. 새로운 라이선스 기능이나 플러그인이 필요하지 않습니다.</p><div class="code"><div class="bar">BASH · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># Elasticsearch 서버 응답 확인 (제07장 설정을 그대로 사용)
+curl -s http://localhost:9200
+
+# 설치된 Python 버전 확인
+python3 --version
+
+# 서버가 중지된 경우 기존 7장 Compose 폴더에서 시작
+# sudo docker compose up -d</code></pre></div><div class="output"><b>예상 출력</b><pre>Elasticsearch 응답 JSON: name, cluster_name, version.number 등</pre></div><p class="explain">접속 오류가 발생하면 기존 컨테이너 상태와 포트 바인딩을 확인합니다. 제07장 예제의 보안 비활성화 설정은 localhost 실습에서만 사용합니다.</p></section><section id="s4"><h2><span>04</span>인덱스 매핑 생성</h2><p>벡터 필드는 <code>dense_vector</code>(덴스 벡터, 밀집 벡터)이며, 여기서는 수학적 동작을 확인하기 위해 <b>3차원</b>을 사용합니다. 실제 <code>bge-m3</code> 모델의 벡터는 1024차원으로, 차원 수가 다른 인덱스에 넣을 수 없습니다.</p><div class="code"><div class="bar">BASH · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># 이전 실습과 충돌하지 않는 새 인덱스 생성
+curl -s -X PUT 'http://localhost:9200/lab08_docs' \
+  -H 'Content-Type: application/json' -d '{
+  "mappings": {"properties": {
+    "title": {"type":"text"},
+    "body": {"type":"text"},
+    "embedding": {"type":"dense_vector","dims":3,
+      "index":true,"similarity":"cosine"}
+  }}
+}'</code></pre></div><div class="output"><b>예상 출력</b><pre>{"acknowledged":true,"shards_acknowledged":true,"index":"lab08_docs"}</pre></div><p class="explain">이미 존재하면 resource_already_exists_exception이 발생합니다. 기존 자료를 무조건 삭제하지 말고 인덱스 이름을 바꿉니다.</p></section><section id="s5"><h2><span>05</span>문서 4개 색인</h2><p>실습용 벡터는 의미를 단순화해 손으로 지정한 <b>교육용 좌표</b>입니다. Ollama가 생성한 임베딩이라고 주장하지 않습니다.</p><div class="code"><div class="bar">BASH · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># NDJSON 벌크 색인: action 행과 document 행이 교대로 배치됨
+cat &gt; /tmp/lab08_docs.ndjson &lt;&lt;'EOF'
+{"index":{"_index":"lab08_docs","_id":"1"}}
+{"title":"UART 통신","body":"UART 직렬 통신으로 센서 데이터를 전송한다","embedding":[1.0,0.0,0.0]}
+{"index":{"_index":"lab08_docs","_id":"2"}}
+{"title":"센서 데이터","body":"온도 센서 측정값을 직렬 포트로 읽는다","embedding":[0.9,0.1,0.0]}
+{"index":{"_index":"lab08_docs","_id":"3"}}
+{"title":"FPGA PWM","body":"FPGA에서 PWM 모터 제어를 설계한다","embedding":[0.0,1.0,0.0]}
+{"index":{"_index":"lab08_docs","_id":"4"}}
+{"title":"벡터 검색","body":"임베딩 벡터로 의미 기반 검색을 수행한다","embedding":[0.0,0.0,1.0]}
+EOF
+
+# 벌크 색인 및 즉시 검색 가능하도록 refresh
+curl -s -X POST 'http://localhost:9200/_bulk?refresh=true' \
+  -H 'Content-Type: application/x-ndjson' \
+  --data-binary @/tmp/lab08_docs.ndjson
+
+# 문서 수 확인
+curl -s 'http://localhost:9200/lab08_docs/_count'</code></pre></div><div class="output"><b>예상 출력</b><pre>벌크 결과의 errors: false
+_count 결과의 count: 4</pre></div><p class="explain">NDJSON 마지막 줄에는 줄바꿈이 있어야 합니다. 벌크 응답의 <code>errors</code> 값과 각 항목의 상태를 확인해야 실제 성공을 판단할 수 있습니다.</p></section><section id="s6"><h2><span>06</span>BM25 키워드 검색</h2><div class="code"><div class="bar">BASH · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># 단어 일치 기반 검색: 제목과 본문 검색
+curl -s -X POST 'http://localhost:9200/lab08_docs/_search' \
+  -H 'Content-Type: application/json' -d '{
+  "size":3,
+  "_source":["title","body"],
+  "query":{"multi_match":{"query":"센서 직렬 통신",
+    "fields":["title","body"]}}
+}'</code></pre></div><div class="output"><b>예상 출력</b><pre>hits.hits 배열에 _id, _score, _source가 포함됨
+순위·점수는 분석기와 인덱스 상태에 따라 달라질 수 있음</pre></div><p class="explain">BM25 점수는 벡터 코사인 유사도가 아닙니다. 형태소 분석·토큰화 설정에 따라 한글 검색 결과가 달라집니다.</p></section><section id="s7"><h2><span>07</span>kNN 벡터 검색</h2><div class="code"><div class="bar">BASH · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># 쿼리 벡터와 가까운 문서 찾기
+curl -s -X POST 'http://localhost:9200/lab08_docs/_search' \
+  -H 'Content-Type: application/json' -d '{
+  "size":3,
+  "_source":["title"],
+  "knn":{"field":"embedding",
+    "query_vector":[1.0,0.0,0.0],
+    "k":3,"num_candidates":4}
+}'</code></pre></div><div class="output"><b>예상 출력</b><pre>문서 1(UART 통신)이 상위에 위치
+문서 2(센서 데이터)도 가까운 벡터로 평가됨</pre></div><p class="explain">코사인 유사도 기준으로 문서 1의 방향이 질의 벡터와 동일합니다. Elasticsearch의 <code>_score</code>는 원시 코사인 값과 동일하다고 가정하면 안 됩니다.</p></section><section id="s8"><h2><span>08</span>Python RRF 통합 실습</h2><p>두 검색의 JSON 결과에서 <code>_id</code>를 추출하여 <b>RRF = Σ 1/(k + rank)</b>를 계산합니다. 같은 문서가 두 결과에서 높은 순위를 차지하면 융합 점수가 증가합니다.</p><div class="code"><div class="bar">PYTHON · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># 파일명: lab08_rrf.py — Python 표준 라이브러리만 사용
+import json
+from urllib.request import Request, urlopen
+
+BASE = "http://localhost:9200/lab08_docs/_search"
+
+
+def search(payload):
+    data = json.dumps(payload).encode("utf-8")
+    req = Request(BASE, data=data,
+                  headers={"Content-Type": "application/json"},
+                  method="POST")
+    with urlopen(req, timeout=10) as response:
+        return json.load(response)["hits"]["hits"]
+
+
+keyword = search({
+    "size": 4,
+    "query": {"multi_match": {
+        "query": "센서 직렬 통신", "fields": ["title", "body"]
+    }}
+})
+vector = search({
+    "size": 4,
+    "knn": {"field": "embedding",
+            "query_vector": [1.0, 0.0, 0.0],
+            "k": 4, "num_candidates": 4}
+})
+
+# 두 검색의 순위를 합산한다. 1위는 1/(60+1)을 더한다.
+scores = {}
+titles = {}
+for hits in (keyword, vector):
+    for rank, hit in enumerate(hits, start=1):
+        doc_id = hit["_id"]
+        scores[doc_id] = scores.get(doc_id, 0.0) + 1 / (60 + rank)
+        titles[doc_id] = hit["_source"]["title"]
+
+print("BM25:", [hit["_id"] for hit in keyword])
+print("kNN :", [hit["_id"] for hit in vector])
+print("RRF 결합 결과:")
+for doc_id in sorted(scores, key=lambda d: (-scores[d], d)):
+    print(doc_id, titles[doc_id], f"{scores[doc_id]:.6f}")</code></pre></div><div class="code"><div class="bar">BASH · 실행 코드 <button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">복사</button></div><pre><code># Python 코드 실행
+python3 lab08_rrf.py</code></pre></div><div class="output"><b>예상 출력 형식 — 실제 순위는 실행환경에 따라 변동</b><pre>BM25: ['...', '...']
+kNN : ['1', '2', ...]
+RRF 결합 결과:
+문서ID 문서제목 융합점수</pre></div><p class="explain">서버에서 실제 검색한 결과를 입력으로 사용합니다. 점수는 각 검색의 원시 점수를 더한 것이 아니라 <b>순위의 역수</b>를 합산한 값입니다. 이 구현은 학습용이며 동점 처리·필터·대량 데이터 운영 기능은 별도 확장이 필요합니다.</p></section><section id="s9"><h2><span>09</span>검색 비교·해석</h2><table><tr><th>방식</th><th>기준</th><th>강점</th><th>주의</th></tr><tr><td>BM25</td><td>토큰·빈도</td><td>정확한 용어 검색</td><td>표현이 다르면 누락 가능</td></tr><tr><td>kNN</td><td>벡터 거리</td><td>유사 의미 탐색</td><td>임베딩 품질 의존</td></tr><tr><td>RRF</td><td>순위 융합</td><td>서로 다른 검색 결과 결합</td><td>가중치·k·후보 수 조정 필요</td></tr></table><p>이번 장의 3차원 좌표는 임베딩 품질을 평가하기 위한 데이터가 아닙니다. 제09장부터 실제 문서 청크와 Ollama 임베딩을 적용합니다.</p></section><section id="s10"><h2><span>10</span>검증·오류 점검</h2><table><tr><th>검증</th><th>정상 조건</th></tr><tr><td>서버</td><td>HTTP 200 및 버전 확인</td></tr><tr><td>매핑</td><td>embedding 필드 dims=3</td></tr><tr><td>색인</td><td>_bulk errors=false, count=4</td></tr><tr><td>검색</td><td>BM25·kNN 각각 hits 배열 반환</td></tr><tr><td>통합</td><td>RRF 문서 ID별 순위 출력</td></tr></table><p><b>오류별 조치:</b> connection refused → Docker 서비스/포트 확인. dimension mismatch → 벡터 차원 확인. HTTP 401 → 이전 장과 보안 설정 불일치 확인. Python KeyError → Elasticsearch 오류 JSON과 hits 구조 확인. 실제 실행 결과는 아직 수집되지 않았습니다.</p></section><section id="s11"><h2><span>11</span>핵심 정리·다음 장</h2><p><b>키워드 검색 → 벡터 검색 → 순위 융합</b>의 세 단계를 완성했습니다. 제09장에서는 문서 원본을 읽고 청크·메타데이터를 생성해 Elasticsearch에 적재하는 흐름을 구현합니다.</p><p>공식 참고: <a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/index">Elasticsearch REST API</a> · <a href="https://www.elastic.co/guide/en/elasticsearch/reference/8.17/dense-vector.html">dense_vector (8.17)</a> · <a href="https://www.elastic.co/guide/en/elasticsearch/reference/8.17/query-dsl-knn-query.html">kNN (8.17)</a></p></section><footer>제08장 · 학습안내서 작성 / Ubuntu 실기 검증 미진행</footer></main></div></body></html>
