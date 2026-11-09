@@ -1,0 +1,163 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제09장 | RAG 문서 적재·분할·메타데이터</title><style>:root{--paper:#f1f2ee;--ink:#171922;--accent:#4836b4;--line:#dcddd8}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);font-family:"Noto Sans KR",system-ui,sans-serif;color:var(--ink);line-height:1.75}.hero{background:#171922;color:white;padding:72px max(24px,calc((100vw - 1160px)/2));background-image:linear-gradient(90deg,#ffffff0a 1px,transparent 1px),linear-gradient(#ffffff0a 1px,transparent 1px);background-size:28px 28px}.hero .k{color:#ffd34f;font-weight:700}.hero h1{font-size:clamp(2.1rem,4.5vw,3.5rem);line-height:1.18;margin:16px 0}.hero p{color:#cbd0d9;max-width:760px}.chips span{display:inline-block;border:1px solid #737782;padding:4px 12px;margin:8px 6px 0 0}.layout{max-width:1160px;margin:auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:36px;padding:30px 22px 70px}nav{position:sticky;top:16px;align-self:start;max-height:95vh;overflow:auto}nav h2{font-size:.83rem;color:#777}nav a{display:block;padding:6px 8px;border-left:2px solid transparent;text-decoration:none;color:#515664;font-size:.88rem}nav a:hover{border-color:var(--accent);color:var(--accent)}section{background:white;border:1px solid var(--line);padding:28px 34px;margin-bottom:17px;scroll-margin-top:20px}section h2{font-size:1.42rem;margin:0 0 18px}section h2 span{font-size:.88rem;color:var(--accent);background:#eeebfa;padding:4px 8px;margin-right:10px}p{color:#444956}table{border-collapse:collapse;width:100%;font-size:.94rem}td,th{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}th{background:#f5f5f2}code{background:#f0f0ed;padding:2px 5px;overflow-wrap:anywhere}.code,.output{border:1px solid var(--line);margin:20px 0 0;background:#fbfbf9}.bar{padding:8px 14px;background:#eeeef0;font-size:.78rem;font-weight:700;color:#4c39b4;display:flex;justify-content:space-between;align-items:center}.bar button{cursor:pointer;border:1px solid #bbb;border-radius:4px;padding:5px 10px;background:white}pre{margin:0;padding:18px;overflow:auto;font-size:.86rem;line-height:1.7;white-space:pre}.output{margin-top:0;background:#f6f8f5}.output .bar{color:#236b4b}.explain{border:1px solid var(--line);border-top:0;padding:15px 20px;margin-bottom:20px}.explain strong{color:var(--accent)}.diagram{border:1px solid var(--line);background:#fafaf8;padding:16px}.lane{padding:14px;border:1px solid #d9d4ed;margin:10px 0;background:white}.lane h3{margin:0 0 12px;font-size:1rem}.nodes{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.nodes span{background:#eeeafa;border:1px solid #cfc6ed;border-radius:4px;padding:8px;font-size:.83rem}.nodes i{color:#4836b4;font-style:normal;font-weight:bold}.note{background:#f0edfa;border-left:4px solid var(--accent);padding:15px;margin:20px 0}a{color:#4836b4}footer{max-width:1160px;margin:auto;padding:20px;color:#777;font-size:.82rem}@media(max-width:900px){.layout{grid-template-columns:1fr}nav{position:static;max-height:none}section{padding:22px}.hero{padding:45px 24px}}</style></head><body><header class="hero"><div class="k">SPRING AI · VECTOR DB · RAG / CHAPTER 09</div><h1>RAG 문서 적재<br>분할·메타데이터</h1><p>원본 텍스트를 검색 가능한 청크로 변환하고, Ollama 임베딩과 Elasticsearch 색인을 연결하는 60분 실습.</p><div class="chips"><span>Ubuntu 24.04</span><span>Python + Ollama</span><span>Elasticsearch</span><span>60분</span></div></header><div class="layout"><nav><h2>목차</h2><a href="#s0">01 · 과제 개요 · 입력과 출력</a><a href="#s1">02 · 전체 구조 · 적재와 검색 분리</a><a href="#s2">03 · 준비 · 실행 전 확인</a><a href="#s3">04 · 교육용 문서 만들기</a><a href="#s4">05 · 청크 설계 · 규칙과 메타데이터</a><a href="#s5">06 · 전체 적재 프로그램 · ingest.py</a><a href="#s6">07 · 프로그램 실행과 색인 수 확인</a><a href="#s7">08 · 검색 검증 · 질문 벡터로 찾기</a><a href="#s8">09 · 검증 · 오류 점검</a><a href="#s9">10 · 고찰 · 실제 문서 확장</a><a href="#s10">11 · 핵심 정리 및 공식 참고</a></nav><main><section id="s0"><h2><span>01</span>과제 개요 · 입력과 출력</h2><p>제08장의 검색 인덱스를 유지하면서 <b>원본 문서 → 구조 추출 → 의미 단위 분할 → 메타데이터 → 임베딩 → Elasticsearch 색인</b>으로 이어지는 적재 파이프라인을 만든다. 이 장은 문서 검색을 위한 <b>적재 단계</b>이며 답변 생성은 제10장에서 수행한다.</p><table><tr><th>입력</th><td>로컬 텍스트 문서 2개(교육용 공개 예제)</td></tr><tr><th>출력</th><td>청크 JSONL, 임베딩 벡터, Elasticsearch 인덱스</td></tr><tr><th>완료 조건</th><td>문서 2개가 청크로 분할되고 검색 결과에 출처·제목·청크 번호가 표시됨</td></tr><tr><th>시간</th><td>개념 10분 / 환경·데이터 10분 / 적재 25분 / 검증 15분</td></tr></table></section><section id="s1"><h2><span>02</span>전체 구조 · 적재와 검색 분리</h2><div class="diagram"><div class="lane"><h3>① 문서 적재 · 이번 장</h3><div class="nodes"><span>원본 TXT</span><i>→</i><span>UTF-8 읽기</span><i>→</i><span>문단 분할</span><i>→</i><span>메타데이터</span><i>→</i><span>Ollama bge-m3</span><i>→</i><span>Elasticsearch</span></div></div><div class="lane"><h3>② 질문 검색 · 다음 장과 연결</h3><div class="nodes"><span>질문</span><i>→</i><span>질문 임베딩</span><i>→</i><span>벡터 검색</span><i>→</i><span>출처 포함 청크</span><i>→</i><span>제10장 답변 생성</span></div></div></div><p>원본 파일은 보존하고, 검색 인덱스에는 문서에서 파생된 청크만 저장한다. <code>source_id</code>, <code>chunk_index</code>는 원문 추적을 위한 식별자다.</p></section><section id="s2"><h2><span>03</span>준비 · 실행 전 확인</h2><div class="code"><div class="bar">CODE · bash<button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">코드 복사</button></div><pre># 기존 도구와 모델 확인
+python3 --version
+curl -fsS http://127.0.0.1:11434/api/tags
+curl -fsS http://127.0.0.1:9200
+
+# Ollama 임베딩 모델(없으면 설치)
+ollama pull bge-m3
+
+# 실습 폴더 생성
+mkdir -p ~/spring-ai-lab/ch09/data
+cd ~/spring-ai-lab/ch09
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install requests</pre></div><div class="output"><div class="bar">EXPECTED OUTPUT · 예상 결과</div><pre>Python 3.x
+Ollama 모델 목록 JSON
+Elasticsearch 클러스터 정보 JSON</pre></div><div class="explain"><strong>코드 풀이 — 이 코드가 무엇을 하는가</strong><p>Elasticsearch는 제07장에서 구성한 로컬 개발용 HTTP 서버를 전제로 한다. 서비스가 꺼져 있으면 기존 Compose 프로젝트에서 먼저 실행한다. 보안 설정이 활성화된 서버는 별도 인증 설정이 필요하다. 이 장의 코드는 localhost 전용이다.</p></div></section><section id="s3"><h2><span>04</span>교육용 문서 만들기</h2><div class="code"><div class="bar">CODE · bash<button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">코드 복사</button></div><pre>cat &gt; data/uart.txt &lt;&lt;'EOF'
+제목: UART 통신
+UART는 비동기 직렬 통신 방식이다. 송신선 TX와 수신선 RX를 사용한다.
+
+UART 프레임은 시작 비트, 데이터 비트, 선택적 패리티 비트, 정지 비트로 구성된다.
+8N1은 데이터 8비트, 패리티 없음, 정지 비트 1개를 뜻한다.
+
+송신기와 수신기는 보레이트를 맞춰야 한다.
+EOF
+
+cat &gt; data/pwm.txt &lt;&lt;'EOF'
+제목: PWM 제어
+PWM은 펄스 폭을 조절하여 평균 출력 효과를 제어하는 방식이다.
+
+듀티비는 한 주기에서 HIGH 상태가 차지하는 비율이다.
+PWM 주파수와 듀티비는 서로 다른 제어 변수다.
+
+LED 밝기 제어와 모터 속도 제어에 활용할 수 있다.
+EOF
+
+wc -c data/*.txt</pre></div><div class="output"><div class="bar">EXPECTED OUTPUT · 예상 결과</div><pre>data/pwm.txt 및 data/uart.txt의 바이트 수 표시</pre></div><div class="explain"><strong>코드 풀이 — 이 코드가 무엇을 하는가</strong><p>원본 문서를 별도 파일로 보존한다. 실제 내부 설계 자료나 개인정보를 공개 저장소에 넣지 않는다.</p></div></section><section id="s4"><h2><span>05</span>청크 설계 · 규칙과 메타데이터</h2><table><tr><th>필드</th><th>역할</th></tr><tr><td><code>source_id</code></td><td>원본 파일 식별자</td></tr><tr><td><code>title</code></td><td>원본 첫 줄 제목</td></tr><tr><td><code>chunk_index</code></td><td>문서 내 청크 순번(0부터)</td></tr><tr><td><code>content</code></td><td>임베딩 및 검색할 본문</td></tr><tr><td><code>content_hash</code></td><td>본문 SHA-256 해시</td></tr><tr><td><code>embedding</code></td><td>bge-m3의 1024차원 벡터</td></tr></table><p>이 실습은 <b>빈 줄로 구분된 문단을 하나의 청크</b>로 사용한다. 문단이 길어지는 실제 PDF·법령 자료에서는 토큰 기준 분할, 중첩, 표·제목 계층 보존이 추가로 필요하다. 파일명과 청크 순번을 이용한 안정적인 문서 ID로 재실행 시 중복 색인을 방지한다.</p></section><section id="s5"><h2><span>06</span>전체 적재 프로그램 · ingest.py</h2><div class="code"><div class="bar">CODE · python · ingest.py<button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">코드 복사</button></div><pre>from pathlib import Path
+import hashlib
+import json
+import os
+import requests
+
+BASE = Path(__file__).resolve().parent
+DATA = BASE / "data"
+OLLAMA = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+ES = os.getenv("ES_URL", "http://127.0.0.1:9200")
+INDEX = "rag_documents_ch09"
+MODEL = "bge-m3"
+DIM = 1024
+
+session = requests.Session()
+session.trust_env = False  # localhost 요청에 외부 프록시가 개입하지 않도록 함
+
+
+def request_json(method, url, **kwargs):
+    response = session.request(method, url, timeout=120, **kwargs)
+    response.raise_for_status()
+    return response.json()
+
+
+def chunks_from_file(path):
+    text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    title = paragraphs[0].removeprefix("제목:").strip()
+    for index, paragraph in enumerate(paragraphs[1:]):
+        yield {
+            "source_id": path.name,
+            "title": title,
+            "chunk_index": index,
+            "content": paragraph,
+            "content_hash": hashlib.sha256(
+                paragraph.encode("utf-8")
+            ).hexdigest(),
+        }
+
+
+def embed(text):
+    data = request_json(
+        "POST", f"{OLLAMA}/api/embed",
+        json={"model": MODEL, "input": text}
+    )
+    vectors = data.get("embeddings", [])
+    if len(vectors) != 1 or len(vectors[0]) != DIM:
+        raise ValueError("임베딩 개수 또는 차원 오류")
+    return vectors[0]
+
+
+def ensure_index():
+    mapping = {
+        "mappings": {
+            "properties": {
+                "source_id": {"type": "keyword"},
+                "title": {"type": "text"},
+                "chunk_index": {"type": "integer"},
+                "content": {"type": "text"},
+                "content_hash": {"type": "keyword"},
+                "embedding": {
+                    "type": "dense_vector",
+                    "dims": DIM,
+                    "index": True,
+                    "similarity": "cosine"
+                }
+            }
+        }
+    }
+    exists = session.head(f"{ES}/{INDEX}", timeout=10)
+    if exists.status_code == 404:
+        request_json("PUT", f"{ES}/{INDEX}", json=mapping)
+    elif exists.status_code != 200:
+        exists.raise_for_status()
+
+
+def main():
+    ensure_index()
+    total = 0
+    with (BASE / "chunks.jsonl").open("w", encoding="utf-8") as out:
+        for path in sorted(DATA.glob("*.txt")):
+            for chunk in chunks_from_file(path):
+                chunk["embedding"] = embed(chunk["content"])
+                doc_id = f'{chunk["source_id"]}:{chunk["chunk_index"]}'
+                request_json(
+                    "PUT", f"{ES}/{INDEX}/_doc/{doc_id}",
+                    json=chunk
+                )
+                out.write(json.dumps(
+                    {k: v for k, v in chunk.items() if k != "embedding"},
+                    ensure_ascii=False
+                ) + "\n")
+                total += 1
+    request_json("POST", f"{ES}/{INDEX}/_refresh")
+    print(f"적재 완료: {total}개 청크")
+
+
+if __name__ == "__main__":
+    main()</pre></div><div class="output"><div class="bar">EXPECTED OUTPUT · 예상 결과</div><pre>적재 완료: 6개 청크</pre></div><div class="explain"><strong>코드 풀이 — 이 코드가 무엇을 하는가</strong><p>두 문서의 첫 문단은 제목으로 사용하고 나머지 문단 3개씩 총 6개 청크를 적재한다. <code>embed()</code>는 Ollama에 각 청크의 벡터를 요청하고 1024차원인지 검사한다. <code>ensure_index()</code>는 Elasticsearch의 기존 인덱스를 보존하고 없을 때만 생성한다. 재실행은 같은 문서 ID를 덮어쓰지만 삭제된 원본 청크를 자동 정리하지는 않는다.</p></div></section><section id="s6"><h2><span>07</span>프로그램 실행과 색인 수 확인</h2><div class="code"><div class="bar">CODE · bash<button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">코드 복사</button></div><pre># Python 코드 실행
+python ingest.py
+
+# 저장한 청크 메타데이터 확인
+head -n 2 chunks.jsonl
+
+# 색인된 문서 수 확인
+curl -fsS http://127.0.0.1:9200/rag_documents_ch09/_count?pretty</pre></div><div class="output"><div class="bar">EXPECTED OUTPUT · 예상 결과</div><pre>적재 완료: 6개 청크
+...
+"count" : 6</pre></div><div class="explain"><strong>코드 풀이 — 이 코드가 무엇을 하는가</strong><p>청크 JSONL에는 임베딩을 제외한 출처와 내용만 기록한다. Elasticsearch에는 본문과 벡터를 함께 저장한다. 같은 데이터로 재실행하면 총 문서 수는 6개를 유지한다.</p></div></section><section id="s7"><h2><span>08</span>검색 검증 · 질문 벡터로 찾기</h2><div class="code"><div class="bar">CODE · python · search.py<button onclick="navigator.clipboard.writeText(this.parentElement.nextElementSibling.innerText)">코드 복사</button></div><pre>from ingest import ES, INDEX, embed, request_json
+
+question = "UART 8N1은 어떤 의미인가?"
+vector = embed(question)
+query = {
+    "size": 3,
+    "_source": ["source_id", "title", "chunk_index", "content"],
+    "knn": {
+        "field": "embedding",
+        "query_vector": vector,
+        "k": 3,
+        "num_candidates": 6
+    }
+}
+result = request_json("POST", f"{ES}/{INDEX}/_search", json=query)
+for hit in result["hits"]["hits"]:
+    item = hit["_source"]
+    print(f'{item["source_id"]} #{item["chunk_index"]}: '
+          f'{item["content"][:80]}')</pre></div><div class="output"><div class="bar">EXPECTED OUTPUT · 예상 결과</div><pre>uart.txt #1: UART 프레임은 시작 비트, 데이터 비트, ...
+(순위 및 점수는 모델 실행 결과에 따라 달라질 수 있음)</pre></div><div class="explain"><strong>코드 풀이 — 이 코드가 무엇을 하는가</strong><p>질문도 문서와 같은 임베딩 모델로 변환해야 한다. <code>_source</code> 필드를 제한하여 1024차원 벡터를 응답에서 제외하고 출처와 내용만 보여준다. 예상 첫 결과는 UART 8N1 설명 문단이다.</p></div></section><section id="s8"><h2><span>09</span>검증 · 오류 점검</h2><table><tr><th>확인</th><th>방법</th><th>기대</th></tr><tr><td>원본 보존</td><td><code>ls data/</code></td><td>TXT 2개</td></tr><tr><td>청크</td><td><code>wc -l chunks.jsonl</code></td><td>6줄</td></tr><tr><td>영속 저장</td><td><code>_count</code> API</td><td>6개</td></tr><tr><td>중복 방지</td><td><code>python ingest.py</code> 재실행</td><td>6개 유지</td></tr><tr><td>출처</td><td><code>python search.py</code></td><td>source_id·chunk_index 출력</td></tr></table><div class="note"><b>오류 대응:</b> 연결 거부 → Ollama·Elasticsearch 상태 확인. 404 모델 오류 → <code>ollama pull bge-m3</code>. 차원 불일치 → 모델·매핑의 <code>dims</code> 일치 여부 확인. 인증 오류 → 제07장의 보안 설정과 맞춰야 한다. 이 코드는 Elasticsearch 8.x의 로컬 단일 노드 학습 환경을 가정한다.</div></section><section id="s9"><h2><span>10</span>고찰 · 실제 문서 확장</h2><p><b>현재 구현 범위:</b> UTF-8 텍스트 문서, 문단 단위 분할, 단일 임베딩 모델, 기본 메타데이터, Elasticsearch 벡터 색인.</p><p><b>다음 확장:</b> PDF 파서와 표/제목 구조 보존(11장), 문서 버전·권한·출처 페이지, 내용 변경 시 기존 청크 삭제, 실패 재시도·배치 색인, 하이브리드 검색(08장) 및 RAG 답변 생성(10장).</p><p>대규모 문서는 무조건 잘게 나누는 것보다 <b>제목 계층·문단 의미·출처 추적 가능성</b>을 유지하는 것이 중요하다.</p></section><section id="s10"><h2><span>11</span>핵심 정리 및 공식 참고</h2><p><b>원본 → 청크 → 메타데이터 → 임베딩 → 색인 → 검색</b>의 흐름을 구현했다. 청크의 출처와 번호가 있어야 검색 결과를 원본에 다시 연결할 수 있다.</p><p>공식 참고: <a href="https://docs.ollama.com/api/embed">Ollama Embeddings API</a> · <a href="https://www.elastic.co/guide/en/elasticsearch/reference/8.17/dense-vector.html">Elasticsearch dense_vector</a> · <a href="https://docs.spring.io/spring-ai/reference/api/etl-pipeline.html">Spring AI ETL 파이프라인</a>. 이 장은 파이프라인 원리를 분리 학습하기 위해 Python 표준 HTTP 클라이언트로 구성했으며, 제10장에서 Spring AI의 Java API로 연결한다.</p><div class="note">검증 상태: 코드·구조 정적 검토 완료. 사용자 Ubuntu의 실제 실행, 컨테이너·모델 응답, 브라우저 렌더링은 미검증이며 출력은 예상 결과다.</div></section></main></div><footer>제09장 · 교육용 실습 문서 · 실제 실행 결과는 별도 검증 필요</footer></body></html>
