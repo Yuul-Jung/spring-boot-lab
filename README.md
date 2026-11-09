@@ -13,6 +13,7 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 - [제03장 — 벡터·임베딩·코사인 유사도 (HTML)](docs/ch03_vector_embedding_cosine.html)
 - [제04장 — Ollama 로컬 LLM과 임베딩 모델 (HTML)](docs/ch04_ollama_local_llm_embedding.html)
 - [제05장 — 메모리 벡터 검색 (HTML)](docs/ch05_memory_vector_search.html)
+- [제06장 — PostgreSQL·pgvector 영속 벡터 검색 (HTML)](docs/ch06_postgresql_pgvector.html)
 
 ## 과정 목차
 
@@ -23,7 +24,7 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 | 03 | 벡터·임베딩·코사인 유사도 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 04 | Ollama 로컬 LLM과 임베딩 모델 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 05 | 메모리 벡터 검색 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
-| 06 | PostgreSQL·pgvector 구축과 유사도 검색 | 예정 |
+| 06 | PostgreSQL·pgvector 구축과 유사도 검색 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 07 | Elasticsearch 기초 및 인덱스 | 예정 |
 | 08 | Elasticsearch 벡터·하이브리드 검색 | 예정 |
 | 09 | RAG 문서 적재·분할·메타데이터 | 예정 |
