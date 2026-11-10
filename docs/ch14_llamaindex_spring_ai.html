@@ -1,0 +1,61 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제14장 LlamaIndex(Python)와 Spring AI 비교</title><style>:root{color-scheme:light}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f2f3ef;color:#20212a;font:17px/1.75 system-ui,'Noto Sans KR',sans-serif}header{background:#171922;color:#fff;padding:64px max(5%,calc((100vw - 1220px)/2))}header h1{font-size:clamp(32px,4.8vw,58px);line-height:1.2;margin:16px 0}header small{color:#ffd34f;letter-spacing:.09em}.layout{max-width:1240px;margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;padding:28px}nav{position:sticky;top:15px;align-self:start;background:#fff;padding:18px;border:1px solid #ddd;border-radius:12px}nav a{display:block;padding:7px 4px;color:#4938aa;text-decoration:none;font-size:14px}nav a:hover{text-decoration:underline}section{background:#fff;border:1px solid #ddd;padding:30px;margin-bottom:20px;border-radius:12px}h2{font-size:25px;border-bottom:2px solid #e7e4f7;padding-bottom:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f4f7;padding:17px;border-radius:8px;font:14px/1.65 ui-monospace,monospace}code{font-family:ui-monospace,monospace}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left;vertical-align:top}.diagram{background:#f8f6ff;border:1px solid #d7d0f4;border-radius:10px;padding:18px}.lane{padding:12px 0;border-bottom:1px solid #e4ddf9}.lane:last-child{border:0}.boxes{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px}.boxes span{background:#eae5ff;border:1px solid #c2b6f2;border-radius:8px;padding:9px 14px}.boxes em{color:#6952b0;font-style:normal}.output{background:#e9f7ee;border-left:5px solid #23845a;padding:18px}.note{background:#fff8dd;border-left:4px solid #c59b20;padding:14px}@media(max-width:850px){.layout{display:block;padding:14px}nav{position:static;margin-bottom:16px}section{padding:20px}header{padding:45px 6%}}</style></head><body><header><small>SPRING AI · VECTOR DB · RAG / CHAPTER 14</small><h1>LlamaIndex(Python)와<br>Spring AI 비교</h1><p>Ubuntu 24.04 · Python · Ollama · Spring AI 연계 · 60분 실습</p></header><div class="layout"><nav><b>학습 목차</b><a href="#intro">01 · 과제 개요 및 입출력</a><a href="#time">02 · 60분 실습 계획</a><a href="#flow">03 · 구조도: 공통 입력과 두 실행 경로</a><a href="#setup">04 · Ubuntu 24.04 준비</a><a href="#code">05 · 전체 Python 코드: ch14_compare.py</a><a href="#run">06 · 실행 → 예상 출력 → 해설</a><a href="#compare">07 · Spring AI와 LlamaIndex 대응표</a><a href="#evaluate">08 · 검색 결과 평가</a><a href="#trouble">09 · 오류 점검</a><a href="#finish">10 · 완료 기준 및 다음 장</a></nav><main><section id="intro"><h2>01 · 과제 개요 및 입출력</h2><p>제10~13장의 Spring AI RAG와 별도의 Python LlamaIndex(라마인덱스, 문서 검색·질의 프레임워크)를 <strong>동일한 문서·질문·임베딩 모델</strong>로 비교한다. 제14장은 기존 Java 프로젝트를 수정하지 않고 독립 Python 폴더에서 실행한다.</p><table><tr><th>입력</th><th>출력</th></tr><tr><td>동일한 3개 기술 문서와 질문 2개</td><td>Python 검색 상위 문서·점수·근거, Spring AI 비교 체크리스트</td></tr><tr><td>선수학습</td><td>제04장 Ollama, 제09장 적재, 제10장 Spring AI, 제13장 평가</td></tr></table><p class="note">이 장의 검색 결과는 독립 메모리 인덱스를 사용한다. Elasticsearch에 저장된 제09장 데이터와 동일 인덱스를 공유하는 실습이 아니다.</p></section><section id="time"><h2>02 · 60분 실습 계획</h2><table><tr><th>시간</th><th>작업</th><th>확인</th></tr><tr><td>0~10분</td><td>환경·Ollama 모델 확인</td><td>버전 및 모델 목록</td></tr><tr><td>10~20분</td><td>Python 가상환경·패키지 설치</td><td>import 성공</td></tr><tr><td>20~35분</td><td>문서 생성·인덱스 작성</td><td>청크와 메타데이터 확인</td></tr><tr><td>35~45분</td><td>검색 2건·근거 출력</td><td>상위 검색 문서 확인</td></tr><tr><td>45~55분</td><td>Spring AI 구조와 비교</td><td>대응표 작성</td></tr><tr><td>55~60분</td><td>오류 점검·완료 판정</td><td>검증표 기록</td></tr></table></section><section id="flow"><h2>03 · 구조도: 공통 입력과 두 실행 경로</h2><div class="diagram"><div class="lane"><strong>공통 입력</strong><div class="boxes"><span>기술 문서 3건</span><em>→</em><span>동일 질문</span><em>→</em><span>Ollama bge-m3</span></div></div><div class="lane"><strong>Python · LlamaIndex</strong><div class="boxes"><span>Document</span><em>→</em><span>SentenceSplitter</span><em>→</em><span>VectorStoreIndex (메모리)</span><em>→</em><span>Retriever</span></div></div><div class="lane"><strong>Java · Spring AI (제10장 참조)</strong><div class="boxes"><span>Document</span><em>→</em><span>TextSplitter</span><em>→</em><span>Elasticsearch VectorStore</span><em>→</em><span>similaritySearch</span></div></div><div class="lane"><strong>비교·평가</strong><div class="boxes"><span>검색 문서 ID</span><em>→</em><span>상위 K</span><em>→</em><span>근거·출처</span><em>→</em><span>제13장 평가 지표</span></div></div></div><p>청크 크기·중첩·저장소가 다르면 점수와 순위가 달라진다. 따라서 이번 실습은 API 구조 비교이며 동일 성능을 입증하지 않는다.</p></section><section id="setup"><h2>04 · Ubuntu 24.04 준비</h2><p>터미널에서 다음 명령을 순서대로 실행한다. Ollama 서버가 이미 실행 중이라면 중복 실행하지 않는다.</p><pre>python3 --version                 # Python 설치 버전 확인
+curl -s http://127.0.0.1:11434/api/tags  # Ollama 서버 응답 확인
+ollama list                       # 설치된 모델 확인
+ollama pull bge-m3                # 임베딩 모델 다운로드
+mkdir -p ~/lab_llamaindex/ch14    # 독립 실습 폴더 생성
+cd ~/lab_llamaindex/ch14         # 실습 폴더 이동
+python3 -m venv .venv            # 가상환경 생성
+source .venv/bin/activate        # 가상환경 활성화
+python -m pip install --upgrade pip
+python -m pip install llama-index-core llama-index-embeddings-ollama</pre><div class="output"><strong>예상 출력</strong><pre>Python 3.x.x
+... bge-m3 ...
+Successfully installed ...</pre></div><p><strong>해설:</strong> <code>llama-index-core</code>는 문서·분할·인덱스 기능, <code>llama-index-embeddings-ollama</code>는 로컬 임베딩 연동 기능을 제공한다. 패키지 버전은 설치 시점에 따라 달라지므로 <code>python -m pip freeze &gt; requirements.lock.txt</code>로 기록한다. 외부 공개 서버에 Ollama API를 무인증 노출하지 않는다.</p></section><section id="code"><h2>05 · 전체 Python 코드: ch14_compare.py</h2><p>아래 코드를 <code>ch14_compare.py</code>로 저장한다. API가 달라질 수 있으므로 설치된 패키지 버전을 함께 기록한다.</p><pre>from llama_index.core import Document, Settings, VectorStoreIndex
+from llama_index.core.node_parser import SentenceSplitter
+from llama_index.embeddings.ollama import OllamaEmbedding
+
+# (추가) 공통 임베딩 모델: 제04장과 동일한 bge-m3
+Settings.embed_model = OllamaEmbedding(
+    model_name="bge-m3", base_url="http://127.0.0.1:11434"
+)
+
+# (추가) 교육용 원본 문서: 개인 정보나 실제 사내 자료 미사용
+source = [
+    ("uart", "UART는 비동기 직렬 통신이다. 시작 비트와 정지 비트를 사용한다."),
+    ("pwm", "PWM은 펄스 폭의 듀티비를 바꿔 평균 전력을 제어한다."),
+    ("adc", "ADC는 아날로그 전압을 디지털 수치로 변환한다."),
+]
+documents = [
+    Document(text=content, metadata={"doc_id": doc_id})
+    for doc_id, content in source
+]
+
+# (추가) 짧은 문서의 분할 조건을 고정
+splitter = SentenceSplitter(chunk_size=256, chunk_overlap=32)
+nodes = splitter.get_nodes_from_documents(documents)
+print(f"원본 문서 수: {len(documents)}")
+print(f"청크 수: {len(nodes)}")
+
+# (추가) 로컬 메모리 인덱스 구성; OpenAI API 키 불필요
+index = VectorStoreIndex(nodes)
+retriever = index.as_retriever(similarity_top_k=2)
+
+questions = [
+    "비동기 직렬 통신은 무엇인가?",
+    "펄스 폭으로 전력을 제어하는 기술은?",
+]
+for question in questions:
+    print(f"\\n질문: {question}")
+    for rank, hit in enumerate(retriever.retrieve(question), 1):
+        doc_id = hit.node.metadata.get("doc_id", "unknown")
+        print(f"{rank}위 | 문서={doc_id} | 점수={hit.score:.4f}")
+        print(hit.node.get_content()[:120])</pre><p><strong>코드 풀이:</strong> <code>Document</code>에 원본 ID를 기록하고, <code>SentenceSplitter</code>로 청크를 만든다. <code>VectorStoreIndex</code>가 Ollama 임베딩을 호출하여 메모리에 벡터를 저장한다. <code>retriever.retrieve()</code>는 질문과 가까운 청크를 반환한다. 이 코드는 답변 생성이 아닌 <strong>검색 검증</strong>에 집중한다.</p></section><section id="run"><h2>06 · 실행 → 예상 출력 → 해설</h2><pre>python ch14_compare.py
+python -m pip freeze &gt; requirements.lock.txt</pre><div class="output"><strong>예상 출력 (실제 실행 결과 아님)</strong><pre>원본 문서 수: 3
+청크 수: 3
+
+질문: 비동기 직렬 통신은 무엇인가?
+1위 | 문서=uart | 점수=... 
+UART는 비동기 직렬 통신이다. ...
+
+질문: 펄스 폭으로 전력을 제어하는 기술은?
+1위 | 문서=pwm | 점수=...
+PWM은 펄스 폭의 듀티비를 ...</pre></div><p><strong>해설:</strong> 청크 수·순위·유사도 점수는 라이브러리 버전과 모델 상태에 따라 달라질 수 있다. <code>...</code>는 미검증 값이며 확정 출력이 아니다. 상위 문서 ID가 예상과 다르면 원문·질문·임베딩 모델을 확인한다.</p></section><section id="compare"><h2>07 · Spring AI와 LlamaIndex 대응표</h2><table><tr><th>기능</th><th>Spring AI (Java)</th><th>LlamaIndex (Python)</th></tr><tr><td>문서 표현</td><td>Document</td><td>Document</td></tr><tr><td>문서 분할</td><td>TokenTextSplitter 등</td><td>SentenceSplitter</td></tr><tr><td>임베딩</td><td>OllamaEmbeddingModel</td><td>OllamaEmbedding</td></tr><tr><td>벡터 저장</td><td>ElasticsearchVectorStore</td><td>VectorStoreIndex (기본 메모리)</td></tr><tr><td>검색</td><td>similaritySearch()</td><td>as_retriever().retrieve()</td></tr><tr><td>답변 생성</td><td>ChatClient + Advisor</td><td>query_engine + LLM 설정</td></tr></table><p>Spring AI 코드는 제10장의 실제 설정과 의존성을 우선한다. 서로 다른 저장소·청크 설정을 사용한 검색 점수를 직접 비교하지 않는다.</p></section><section id="evaluate"><h2>08 · 검색 결과 평가</h2><p>제13장과 동일한 기준으로 <strong>질문별 정답 문서 ID</strong>를 지정한다. 첫 질문의 정답은 <code>uart</code>, 두 번째 질문은 <code>pwm</code>이다. 상위 2개 결과에 정답이 포함되는지 기록한다.</p><table><tr><th>질문</th><th>정답 ID</th><th>검색 상위 2개</th><th>Hit@2</th></tr><tr><td>비동기 직렬 통신</td><td>uart</td><td>실행 후 기입</td><td>미검증</td></tr><tr><td>펄스 폭 제어</td><td>pwm</td><td>실행 후 기입</td><td>미검증</td></tr></table><p>두 프레임워크를 엄밀히 비교하려면 동일한 원문, 분할 경계, 임베딩 모델, 검색 설정 및 검색 후보 집합을 맞춰야 한다.</p></section><section id="trouble"><h2>09 · 오류 점검</h2><table><tr><th>증상</th><th>확인 및 조치</th></tr><tr><td>Connection refused</td><td><code>curl http://127.0.0.1:11434/api/tags</code>로 Ollama 상태 확인</td></tr><tr><td>Model not found</td><td><code>ollama pull bge-m3</code> 후 <code>ollama list</code> 확인</td></tr><tr><td>ModuleNotFoundError</td><td>가상환경 활성화와 <code>python -m pip show llama-index-core</code> 확인</td></tr><tr><td>점수·순위 불일치</td><td>모델·문서·분할 조건·버전 기록 후 비교</td></tr><tr><td>Spring AI 결과와 다름</td><td>메모리 저장소와 Elasticsearch 저장소의 차이부터 확인</td></tr></table></section><section id="finish"><h2>10 · 완료 기준 및 다음 장</h2><p>완료 기준: ① Ollama <code>bge-m3</code> 응답 ② Python 패키지 설치 ③ 문서 3건 적재 ④ 질문 2건 검색 ⑤ 출처 ID 출력 ⑥ Spring AI와 구조 비교 ⑦ 의존성 버전 기록.</p><p><strong>다음 제15장:</strong> Spring AI + Elasticsearch + Ollama 기반 통합 RAG 서비스 구성과 배포·검증. 제14장의 Python LlamaIndex는 비교·확장용 독립 경로로 유지한다.</p><p>공식 참고: <a href="https://docs.llamaindex.ai/">LlamaIndex 문서</a> · <a href="https://docs.spring.io/spring-ai/reference/">Spring AI 문서</a> · <a href="https://docs.ollama.com/">Ollama 문서</a></p></section></main></div></body></html>
