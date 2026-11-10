@@ -1,0 +1,86 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제12장 ERP 및 도메인 문서 RAG</title><style>body{margin:0;background:#f2f3ef;color:#20212a;font:17px/1.8 system-ui,sans-serif}header{background:#171922;color:white;padding:65px 8%}header h1{font-size:clamp(32px,5vw,56px);line-height:1.2}header small{color:#ffd34f}.layout{max-width:1200px;margin:auto;display:grid;grid-template-columns:230px 1fr;gap:25px;padding:30px}nav{position:sticky;top:15px;align-self:start}nav a{display:block;padding:9px;color:#4836b4;text-decoration:none}section{background:white;border:1px solid #ddd;padding:30px;margin-bottom:18px}h2{border-bottom:2px solid #e7e4f7;padding-bottom:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f4f7;padding:17px;font-size:14px}.diagram{display:flex;flex-wrap:wrap;gap:10px;background:#faf8ff;padding:18px}.diagram span{background:#ece7ff;padding:10px;border:1px solid #c5b9f4}.output{background:#eef9f0;padding:15px;border-left:4px solid #23845a}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left}@media(max-width:800px){.layout{display:block}nav{position:static}section{padding:20px}}</style></head><body><header><small>SPRING AI · RAG / CHAPTER 12</small><h1>ERP 및 도메인 문서 RAG<br>메타데이터 기반 검색</h1><p>Ubuntu 24.04 · Ollama · Elasticsearch · Python · 60분</p></header><div class="layout"><nav><b>목차</b><a href="#a">01 개요</a><a href="#b">02 처리 구조</a><a href="#c">03 준비</a><a href="#d">04 전체 코드</a><a href="#e">05 실행 결과</a><a href="#f">06 검증</a><a href="#g">07 Spring AI 연계</a></nav><main><section id="a"><h2>01 · 개요 및 60분 일정</h2><p>가상 ERP(전사적 자원관리)와 기술 문서에 문서 유형, 부서, 접근 등급을 부여하고 역할별 벡터 검색을 수행한다. 실제 기업 정보는 사용하지 않는다. 기존 제01~11장 파일은 수정하지 않는다.</p><table><tr><th>시간</th><th>실습</th></tr><tr><td>0~10분</td><td>환경 확인</td></tr><tr><td>10~20분</td><td>메타데이터 설계</td></tr><tr><td>20~35분</td><td>색인</td></tr><tr><td>35~50분</td><td>검색</td></tr><tr><td>50~60분</td><td>검증</td></tr></table></section><section id="b"><h2>02 · 전체 구조</h2><div class="diagram"><span>가상 문서</span> → <span>메타데이터</span> → <span>Ollama bge-m3</span> → <span>Elasticsearch</span></div><div class="diagram"><span>질문·역할</span> → <span>권한 필터</span> → <span>kNN 검색</span> → <span>출처 결과</span></div><p>검색 필터는 교육용이며 실제 접근 통제는 인증된 서버에서 강제해야 한다.</p></section><section id="c"><h2>03 · Ubuntu 환경 준비</h2><pre># Elasticsearch와 Ollama 실행 여부 확인
+curl -fsS http://127.0.0.1:9200
+ollama list
+# bge-m3가 없으면 설치
+ollama pull bge-m3
+mkdir -p ~/spring-boot-lab/ch12_domain_rag
+cd ~/spring-boot-lab/ch12_domain_rag
+python3 -m venv .venv
+source .venv/bin/activate
+pip install 'requests&gt;=2.31,&lt;3'</pre><div class="output">예상 출력: Elasticsearch 서버 JSON 및 Ollama 모델 목록 표시 (실제 미검증)</div><p><b>코드 풀이:</b> 독립 가상환경을 사용하여 기존 Spring Boot/Java 프로젝트를 보존한다.</p></section><section id="d"><h2>04 · 전체 실습 코드: domain_rag.py</h2><pre>import requests
+
+ES = "http://127.0.0.1:9200"
+OLLAMA = "http://127.0.0.1:11434"
+INDEX = "rag_domain_ch12"
+
+docs = [
+ {"id":"erp1","title":"구매 요청","kind":"erp","level":"public",
+  "dept":"purchase","text":"구매 요청은 부서장의 승인을 받는다."},
+ {"id":"erp2","title":"결산 검토","kind":"erp","level":"internal",
+  "dept":"finance","text":"결산 검토표와 승인 이력을 기록한다."},
+ {"id":"tech1","title":"UART 점검","kind":"technical","level":"public",
+  "dept":"engineering","text":"UART 시작 비트와 정지 비트를 확인한다."},
+ {"id":"tech2","title":"모터 보호","kind":"technical","level":"internal",
+  "dept":"engineering","text":"과전류 보호와 전원 분리를 검토한다."}
+]
+
+def embed(text):
+    r = requests.post(f"{OLLAMA}/api/embed",
+        json={"model":"bge-m3","input":text},timeout=120)
+    r.raise_for_status()
+    v = r.json()["embeddings"][0]
+    if len(v) != 1024:
+        raise ValueError("임베딩 차원 오류")
+    return v
+
+mapping = {"mappings":{"properties":{
+    "title":{"type":"text"},"text":{"type":"text"},
+    "kind":{"type":"keyword"},"level":{"type":"keyword"},
+    "dept":{"type":"keyword"},
+    "vector":{"type":"dense_vector","dims":1024,
+              "index":True,"similarity":"cosine"}
+}}}
+r = requests.put(f"{ES}/{INDEX}",json=mapping,timeout=30)
+if r.status_code == 400:
+    if r.json().get("error",{}).get("type") != "resource_already_exists_exception":
+        r.raise_for_status()
+else:
+    r.raise_for_status()
+
+for doc in docs:
+    body = {k:v for k,v in doc.items() if k != "id"}
+    body["vector"] = embed(doc["title"]+" "+doc["text"])
+    r = requests.put(f"{ES}/{INDEX}/_doc/{doc['id']}",
+        params={"refresh":"true"},json=body,timeout=120)
+    r.raise_for_status()
+print("색인 완료: 4건")
+
+def search(question,role,kind):
+    levels = {"guest":["public"],"staff":["public","internal"]}
+    if role not in levels:
+        raise ValueError("허용되지 않은 역할")
+    filters = [{"terms":{"level":levels[role]}},
+               {"term":{"kind":kind}}]
+    query = {"size":3,"_source":["title","kind","dept","level"],
+      "knn":{"field":"vector","query_vector":embed(question),
+             "k":3,"num_candidates":10,
+             "filter":{"bool":{"filter":filters}}}}
+    r = requests.post(f"{ES}/{INDEX}/_search",
+        json=query,timeout=120)
+    r.raise_for_status()
+    for hit in r.json()["hits"]["hits"]:
+        d = hit["_source"]
+        print(hit["_id"],d["title"],d["level"])
+
+print("[guest]")
+search("구매 결산 승인","guest","erp")
+print("[staff]")
+search("구매 결산 승인","staff","erp")</pre><p><b>코드 풀이:</b> 고정 ID를 사용하므로 반복 실행해도 문서가 중복되지 않는다. Elasticsearch의 kNN 검색에 등급 및 유형 필터를 적용한다. 임베딩 차원은 1024로 검증한다.</p></section><section id="e"><h2>05 · 실행 및 예상 출력</h2><pre>python domain_rag.py
+curl -fsS http://127.0.0.1:9200/rag_domain_ch12/_count</pre><div class="output"><b>예상 출력 — 실제 실행 미검증</b><pre>색인 완료: 4건
+[guest]
+erp1 구매 요청 public
+[staff]
+erp1 구매 요청 public
+erp2 결산 검토 internal
+
+_count 응답의 count: 4</pre></div><p>유사도 순위는 모델 환경에 따라 달라질 수 있으나 guest에게 internal 문서가 반환되면 안 된다.</p></section><section id="f"><h2>06 · 검증 및 오류 점검</h2><table><tr><th>검증</th><th>예상 결과</th></tr><tr><td>guest + ERP</td><td>public만 반환</td></tr><tr><td>staff + ERP</td><td>public/internal 반환</td></tr><tr><td>guest + technical</td><td>tech1만 반환</td></tr><tr><td>알 수 없는 역할</td><td>ValueError</td></tr><tr><td>재실행</td><td>문서 수 4 유지</td></tr></table><p>연결 실패는 Docker 및 Ollama 상태를 점검한다. 모델 미설치는 ollama pull bge-m3로 해결한다. 인덱스 매핑이 다르면 기존 전용 인덱스를 확인한다. Elasticsearch 직접 접속은 이 교육용 필터를 우회할 수 있으므로 외부에 공개하지 않는다.</p></section><section id="g"><h2>07 · Spring AI 연계 및 핵심 정리</h2><div class="diagram"><span>인증된 사용자</span> → <span>서버 역할 확인</span> → <span>필터된 검색 결과</span> → <span>Spring AI ChatModel</span> → <span>답변·출처</span></div><p>제10장의 답변 생성에는 권한을 통과한 문서만 전달한다. title·kind·dept를 출처로 표시하고 실제 서비스에서는 서버 측 인증, 문서별 ACL, 감사 로그가 필요하다. 기존 Java 파일은 변경하지 않는다.</p><p>다음 제13장: 검색 평가·출처 검증·성능 개선. 참고: <a href="https://docs.spring.io/spring-ai/reference/">Spring AI</a>, <a href="https://www.elastic.co/guide/en/elasticsearch/reference/8.17/knn-search.html">Elasticsearch kNN</a>.</p><p><b>검증 상태:</b> 문서 작성 및 정적 검토. Ubuntu 실제 실행, 색인, Spring AI 통합 및 브라우저 렌더링은 미검증.</p></section></main></div></body></html>
