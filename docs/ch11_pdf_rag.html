@@ -1,0 +1,97 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제11장 | PDF 기반 RAG 구현</title><style>:root{--paper:#f1f2ee;--ink:#171922;--accent:#4836b4;--line:#dcddd8}*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--paper);font-family:"Noto Sans KR",system-ui,sans-serif;color:var(--ink);line-height:1.75}.hero{background:#171922;color:white;padding:70px max(24px,calc((100vw - 1160px)/2));background-image:linear-gradient(90deg,#ffffff0a 1px,transparent 1px),linear-gradient(#ffffff0a 1px,transparent 1px);background-size:28px 28px}.hero small{color:#ffd34f;font-weight:700}.hero h1{font-size:clamp(2.1rem,4.5vw,3.4rem);line-height:1.2;margin:16px 0}.hero p{color:#cbd0d9}.chip{display:inline-block;border:1px solid #737782;padding:4px 12px;margin:8px 6px 0 0}.layout{max-width:1160px;margin:auto;display:grid;grid-template-columns:220px minmax(0,1fr);gap:36px;padding:30px 22px 70px}nav{position:sticky;top:16px;align-self:start;max-height:95vh;overflow:auto}nav h2{font-size:.85rem;color:#777}nav a{display:block;padding:6px 8px;border-left:2px solid transparent;text-decoration:none;color:#515664;font-size:.88rem}nav a:hover{border-color:var(--accent);color:var(--accent)}main{min-width:0}section{background:white;border:1px solid var(--line);padding:28px 34px;margin-bottom:17px;scroll-margin-top:20px}section h2{font-size:1.42rem;margin:0 0 18px}section h2 span{font-size:.88rem;color:var(--accent);background:#eeebfa;padding:4px 8px;margin-right:10px}p{color:#444956}table{border-collapse:collapse;width:100%;font-size:.94rem}td,th{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}th{background:#f5f5f2}code{background:#f0f0ed;padding:2px 5px;overflow-wrap:anywhere}.code,.output{border:1px solid var(--line);margin:20px 0 0;background:#fbfbf9}.bar{padding:8px 14px;background:#eeeef0;font-size:.8rem;font-weight:700;color:#4c39b4;display:flex;justify-content:space-between;align-items:center}.bar button{cursor:pointer;border:1px solid #bbb;padding:5px 10px;background:white}pre{margin:0;padding:18px;overflow:auto;font-size:.85rem;line-height:1.7;white-space:pre}.output{margin-top:0;background:#f6f8f5}.output .bar{color:#236b4b}.explain{border:1px solid var(--line);border-top:0;padding:15px 20px;margin-bottom:20px}.diagram{border:1px solid var(--line);background:#fafaf8;padding:16px}.lane{padding:14px;border:1px solid #d9d4ed;margin:10px 0;background:white}.nodes{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.nodes span{background:#eeeafa;border:1px solid #cfc6ed;padding:8px;font-size:.85rem}.note{background:#f0edfa;border-left:4px solid var(--accent);padding:15px;margin:20px 0}a{color:#4836b4}@media(max-width:850px){.layout{display:block}nav{position:static;max-height:none;margin-bottom:25px}section{padding:20px}.hero{padding:45px 22px}}</style></head><body><header class="hero"><small>SPRING AI · RAG / CHAPTER 11</small><h1>PDF 기반 RAG 구현<br>페이지 출처 추적</h1><p>PDF 텍스트 추출부터 Elasticsearch 색인과 Spring AI 답변까지 연결하는 60분 실습</p><span class="chip">Ubuntu 24.04</span><span class="chip">Python · pypdf</span><span class="chip">Elasticsearch</span><span class="chip">Ollama</span><span class="chip">60분</span></header><div class="layout"><nav><h2>목차</h2><a href="#s0">01 · 과제 개요</a><a href="#s1">02 · 전체 동작 구조</a><a href="#s2">03 · 60분 실습 순서</a><a href="#s3">04 · 환경 및 PDF 준비</a><a href="#s4">05 · PDF 텍스트 추출 확인</a><a href="#s5">06 · PDF 적재 전체 코드</a><a href="#s6">07 · 색인 결과 및 출처 확인</a><a href="#s7">08 · Spring AI RAG 연동</a><a href="#s8">09 · 검증 및 오류 점검</a><a href="#s9">10 · 핵심 정리 및 다음 장</a></nav><main><section id="s0"><h2><span>01</span>과제 개요</h2><p>제09장의 문서 적재와 제10장의 질문·답변을 PDF로 확장한다. 이번 장은 <strong>PDF → 페이지별 추출 → 청크 → 출처 메타데이터 → Elasticsearch 색인</strong>을 완성한다. 질문·답변은 기존 제10장 API를 재사용한다.</p><table><tr><th>입력</th><td>텍스트 선택 가능한 PDF 1개 (<code>data/manual.pdf</code>)</td></tr><tr><th>출력</th><td>Elasticsearch <code>rag_documents</code> 색인, 페이지별 출처 정보</td></tr><tr><th>기존</th><td>제09장 색인, 제10장 RAG API</td></tr><tr><th>추가</th><td>PDF 페이지 추출, 페이지 번호, 파일 해시, 중복 색인 방지</td></tr></table><p class="note">스캔 이미지 PDF는 텍스트가 추출되지 않을 수 있다. OCR(광학 문자 인식)은 별도 확장 실습이다.</p></section><section id="s1"><h2><span>02</span>전체 동작 구조</h2><div class="diagram"><div class="lane"><strong>문서 적재</strong><div class="nodes"><span>PDF 파일</span> → <span>pypdf 페이지 추출</span> → <span>청크·페이지·해시</span> → <span>Ollama bge-m3</span> → <span>Elasticsearch rag_documents</span></div></div><div class="lane"><strong>질의 응답</strong><div class="nodes"><span>질문</span> → <span>제10장 Spring AI API</span> → <span>Elasticsearch 검색</span> → <span>Ollama 답변</span> → <span>출처 확인</span></div></div></div><p>원본 파일과 색인 문서는 별도로 관리한다. <code>source</code>와 <code>page</code>를 응답 출처에 표시하려면 제10장 응답 구성도 해당 메타데이터를 읽도록 확인해야 한다.</p></section><section id="s2"><h2><span>03</span>60분 실습 순서</h2><table><tr><th>시간</th><th>실습</th></tr><tr><td>0~10분</td><td>환경·기존 인덱스 확인</td></tr><tr><td>10~20분</td><td>PDF 준비·페이지 추출</td></tr><tr><td>20~40분</td><td>청크·임베딩·색인</td></tr><tr><td>40~50분</td><td>검색·페이지 출처 확인</td></tr><tr><td>50~60분</td><td>제10장 연동·오류 점검</td></tr></table></section><section id="s3"><h2><span>04</span>환경 및 PDF 준비</h2><p>기존 제09장 Elasticsearch(로컬 <code>localhost:9200</code>)와 Ollama(<code>localhost:11434</code>)가 실행 중이어야 한다. Python 가상환경을 사용한다.</p><div class="code"><div class="bar">Ubuntu Bash <button onclick="copy(this)">복사</button></div><pre>mkdir -p ch11_pdf/data &amp;&amp; cd ch11_pdf
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install pypdf requests
+curl -fsS http://localhost:9200
+curl -fsS http://localhost:11434/api/tags
+# 저작권·개인정보를 확인한 텍스트형 PDF를 data/manual.pdf로 복사</pre></div><div class="output"><div class="bar">예상 출력</div><pre>Elasticsearch 클러스터 정보(JSON)
+Ollama 설치 모델 목록(JSON)</pre></div><div class="explain"><b>코드 풀이 — 이 코드가 무엇을 하는가</b><p>격리된 Python 환경을 만들고 PDF 읽기와 HTTP 호출 라이브러리를 설치한다. 두 서비스의 응답 여부를 확인한 뒤 공개 가능한 PDF를 준비한다.</p></div></section><section id="s4"><h2><span>05</span>PDF 텍스트 추출 확인</h2><div class="code"><div class="bar">check_pdf.py <button onclick="copy(this)">복사</button></div><pre>from pathlib import Path
+from pypdf import PdfReader
+
+path = Path("data/manual.pdf")
+reader = PdfReader(str(path))
+print("pages:", len(reader.pages))
+for number, page in enumerate(reader.pages, start=1):
+    text = page.extract_text() or ""
+    print(f"page={number}, chars={len(text)}")
+    print(text[:120].replace("\n", " "))</pre></div><div class="code"><div class="bar">실행 <button onclick="copy(this)">복사</button></div><pre>python check_pdf.py</pre></div><div class="output"><div class="bar">예상 출력 (PDF에 따라 다름)</div><pre>pages: 2
+page=1, chars=348
+page=2, chars=290</pre></div><div class="explain"><b>코드 풀이 — 이 코드가 무엇을 하는가</b><p><code>PdfReader</code>는 PDF 페이지를 순회하고 <code>extract_text()</code>는 선택 가능한 문자만 추출한다. 글자 수가 0이라면 OCR이 필요하거나 문서가 비어 있을 수 있다.</p></div></section><section id="s5"><h2><span>06</span>PDF 적재 전체 코드</h2><p>제09장의 인덱스 <code>rag_documents</code>에 동일한 필드명 <code>content</code>, <code>embedding</code>을 사용한다. 인덱스 매핑에서 <code>embedding</code>이 1024차원 <code>dense_vector</code>인지 먼저 확인한다. 다른 매핑이면 기존 인덱스를 수정하지 말고 별도 인덱스를 만든다.</p><div class="code"><div class="bar">ingest_pdf.py <button onclick="copy(this)">복사</button></div><pre>import hashlib
+import os
+from pathlib import Path
+
+import requests
+from pypdf import PdfReader
+
+ES = os.getenv("ES_URL", "http://localhost:9200")
+OLLAMA = os.getenv("OLLAMA_URL", "http://localhost:11434")
+INDEX = "rag_documents"
+PDF = Path("data/manual.pdf")
+session = requests.Session()
+session.trust_env = False  # 로컬 실습 요청에 프록시 적용 방지
+
+def chunk_text(text, size=700, overlap=100):
+    # 앞 청크의 마지막 100자를 다음 청크에 중복 포함
+    step = size - overlap
+    return [text[i:i + size] for i in range(0, len(text), step)
+            if text[i:i + size].strip()]
+
+def embed(text):
+    response = session.post(
+        f"{OLLAMA}/api/embed",
+        json={"model": "bge-m3", "input": text},
+        timeout=120,
+    )
+    response.raise_for_status()
+    vector = response.json()["embeddings"][0]
+    if len(vector) != 1024:
+        raise ValueError(f"expected 1024 dimensions: {len(vector)}")
+    return vector
+
+def main():
+    if not PDF.is_file():
+        raise FileNotFoundError(PDF)
+    digest = hashlib.sha256(PDF.read_bytes()).hexdigest()
+    mapping = session.get(f"{ES}/{INDEX}/_mapping", timeout=20)
+    mapping.raise_for_status()
+    field = mapping.json()[INDEX]["mappings"]["properties"]["embedding"]
+    if field.get("dims") != 1024:
+        raise ValueError("embedding mapping must have dims=1024")
+    total = 0
+    for page_num, page in enumerate(PdfReader(str(PDF)).pages, 1):
+        text = (page.extract_text() or "").strip()
+        if not text:
+            print(f"skip empty page: {page_num}")
+            continue
+        for chunk_num, content in enumerate(chunk_text(text), 1):
+            doc_id = f"{digest[:16]}-p{page_num}-c{chunk_num}"
+            doc = {
+                "content": content,
+                "embedding": embed(content),
+                "source": PDF.name,
+                "page": page_num,
+                "chunk_id": chunk_num,
+                "content_hash": digest,
+            }
+            result = session.put(
+                f"{ES}/{INDEX}/_doc/{doc_id}",
+                json=doc, timeout=120,
+            )
+            result.raise_for_status()
+            total += 1
+    session.post(f"{ES}/{INDEX}/_refresh", timeout=20).raise_for_status()
+    print(f"indexed: {total}")
+
+if __name__ == "__main__":
+    main()</pre></div><div class="code"><div class="bar">실행 <button onclick="copy(this)">복사</button></div><pre>python ingest_pdf.py</pre></div><div class="output"><div class="bar">예상 출력 (PDF에 따라 다름)</div><pre>indexed: 5</pre></div><div class="explain"><b>코드 풀이 — 이 코드가 무엇을 하는가</b><p>파일 SHA-256과 페이지·청크 번호로 고정 문서 ID를 만든다. 동일 PDF를 다시 실행하면 같은 ID가 갱신되므로 중복 증가를 방지한다. PDF 내용이 바뀌면 새 ID가 생성되므로 이전 버전 삭제는 별도 관리해야 한다. <code>timeout</code>과 HTTP 오류 검사를 포함한다.</p></div></section><section id="s6"><h2><span>07</span>색인 결과 및 출처 확인</h2><div class="code"><div class="bar">검색·메타데이터 확인 <button onclick="copy(this)">복사</button></div><pre>curl -sS 'http://localhost:9200/rag_documents/_search?pretty' \
+  -H 'Content-Type: application/json' \
+  -d '{"size":5,"_source":["source","page","chunk_id","content"],"query":{"term":{"source.keyword":"manual.pdf"}}}'</pre></div><div class="output"><div class="bar">예상 출력 (매핑·PDF에 따라 다름)</div><pre>"source": "manual.pdf",
+"page": 1,
+"chunk_id": 1,
+"content": "..."</pre></div><div class="explain"><b>코드 풀이 — 이 코드가 무엇을 하는가</b><p><code>source.keyword</code>는 <code>source</code>가 기본 동적 매핑으로 생성된 경우에 사용한다. <code>source</code>가 <code>keyword</code>로 정의되어 있다면 <code>source</code> 필드를 직접 검색한다. 실제 매핑은 <code>GET /rag_documents/_mapping</code>으로 확인한다.</p></div></section><section id="s7"><h2><span>08</span>Spring AI RAG 연동</h2><p>제10장의 검색 API에 PDF 내용에 대한 질문을 전송한다. 검색 결과에서 <code>source</code>, <code>page</code>가 반환되는지 확인한다. 기존 API가 출처를 파일명만 반환한다면 서비스의 출처 매핑에 페이지 필드를 추가해야 한다.</p><div class="code"><div class="bar">연동 확인 예시 <button onclick="copy(this)">복사</button></div><pre># 제10장에서 사용한 실제 엔드포인트·요청 형식으로 변경
+# 예시: GET /api/rag?question=...
+curl -G 'http://localhost:8080/api/rag' \
+  --data-urlencode 'question=PDF에서 설명한 핵심 개념은 무엇인가?'</pre></div><div class="output"><div class="bar">예상 출력 (기존 API 구현에 따라 다름)</div><pre>{
+  "answer": "검색된 PDF 내용에 근거한 설명...",
+  "sources": ["manual.pdf, p.1"]
+}</pre></div><div class="explain"><b>코드 풀이 — 이 코드가 무엇을 하는가</b><p>질문으로 검색한 근거가 PDF 청크인지 확인한다. 출처의 페이지 번호가 누락되면 제10장의 응답 생성 코드를 보완해야 한다. 예시 응답은 실제 실행 결과가 아니다.</p></div></section><section id="s8"><h2><span>09</span>검증 및 오류 점검</h2><table><tr><th>점검</th><th>판정 기준</th></tr><tr><td>PDF 추출</td><td>페이지별 문자 수가 0보다 큼</td></tr><tr><td>임베딩</td><td>각 청크 벡터 길이 1024</td></tr><tr><td>인덱스</td><td><code>rag_documents</code>에 매핑 호환</td></tr><tr><td>출처</td><td>파일명·페이지·청크 번호 저장</td></tr><tr><td>재실행</td><td>동일 PDF에서 문서 ID 중복 생성 없음</td></tr><tr><td>응답</td><td>제10장 검색·생성 API가 PDF를 근거로 사용</td></tr></table><p class="note">실패 사례: <code>404</code>는 인덱스 없음, <code>connection refused</code>는 서비스 미실행, <code>dims</code> 오류는 임베딩 모델·매핑 불일치, 빈 페이지는 스캔 PDF 가능성을 의미한다.</p></section><section id="s9"><h2><span>10</span>핵심 정리 및 다음 장</h2><p>PDF 문서는 페이지별로 추출한 뒤 청크와 출처 메타데이터를 함께 저장해야 답변의 근거를 추적할 수 있다. 문서 내용의 정합성과 검색 품질은 별도 검증 대상이다.</p><p><strong>제12장:</strong> ERP 및 도메인 문서 RAG — 문서 유형별 메타데이터와 접근 권한 확장.</p><p>참고: <a href="https://pypdf.readthedocs.io/en/stable/">pypdf 공식 문서</a> · <a href="https://docs.spring.io/spring-ai/reference/">Spring AI 공식 문서</a> · <a href="https://www.elastic.co/docs/reference/elasticsearch/rest-apis/index">Elasticsearch API</a> · <a href="https://docs.ollama.com/api/embed">Ollama 임베딩 API</a></p></section></main></div><script>function copy(b){const t=b.closest('.code').querySelector('pre').innerText;navigator.clipboard.writeText(t).then(()=>{b.textContent='복사됨';setTimeout(()=>b.textContent='복사',1400)}).catch(()=>alert('브라우저 권한을 확인하세요'))}</script></body></html>
