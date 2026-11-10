@@ -62,9 +62,9 @@ cited = {"tech_uart", "unknown_source"}
 invalid = cited - retrieved
 print("출처 ID 검사:", "통과" if not invalid else f"실패 {sorted(invalid)}")
 # 주의: ID가 존재해도 답변 내용의 사실성까지 보장하지 않음
-</code></pre><p><strong>코드 풀이:</strong> <code>gold</code>는 정답 집합, <code>runs</code>는 검색 결과 순위다. <code>evaluate()</code>가 각 질문의 지표를 계산한 뒤 평균을 낸다. <code>invalid</code>는 검색 목록에 없는 출처 ID를 검출한다.</p></section><section id="output"><h2>07 · 예상 출력과 해설</h2><div class="output"><b>예상 출력 — 실제 Ubuntu 실행 미검증</b><pre><code>baseline  P@3=0.417 R@3=0.875 MRR=0.542
+</code></pre><p><strong>코드 풀이:</strong> <code>gold</code>는 정답 집합, <code>runs</code>는 검색 결과 순위다. <code>evaluate()</code>가 각 질문의 지표를 계산한 뒤 평균을 낸다. <code>invalid</code>는 검색 목록에 없는 출처 ID를 검출한다.</p></section><section id="output"><h2>07 · 예상 출력과 해설</h2><div class="output"><b>예상 출력 — 실제 Ubuntu 실행 미검증</b><pre><code>baseline  P@3=0.333 R@3=0.875 MRR=0.583
 candidate P@3=0.417 R@3=1.000 MRR=1.000
-출처 ID 검사: 실패 ['unknown_source']</code></pre></div><p><strong>해설:</strong> Candidate는 첫 정답 문서가 모두 1위에 있어 MRR이 높다. P@3는 두 실행 모두 5개의 정답을 총 12개 결과에서 찾아 동일하다. Baseline은 q1에서 두 정답 중 하나만 검색해 R@3 평균이 낮다. 출처 검사 실패는 <code>unknown_source</code>가 검색 결과에 없기 때문이다.</p></section><section id="integration"><h2>08 · 실제 Elasticsearch 검색 결과로 교체</h2><p>제12장의 검색 코드가 반환하는 <code>_id</code> 목록을 질문별로 저장하여 <code>runs["candidate"]</code> 대신 입력한다. 정답 <code>gold</code>는 검색 전에 사람이 판정한 문서 ID로 구성해야 평가 누출을 피할 수 있다.</p><pre><code class="language-python"># 예시: 제12장 검색 응답 JSON의 hits를 받았을 때
+출처 ID 검사: 실패 ['unknown_source']</code></pre></div><p><strong>해설:</strong> Candidate는 첫 정답 문서가 모두 1위에 있어 MRR이 높다. P@3는 Baseline이 총 12개 결과에서 정답 4개, Candidate가 5개를 찾아 Candidate가 더 높다. Baseline은 q1에서 두 정답 중 하나만 검색해 R@3 평균이 낮다. 출처 검사 실패는 <code>unknown_source</code>가 검색 결과에 없기 때문이다.</p></section><section id="integration"><h2>08 · 실제 Elasticsearch 검색 결과로 교체</h2><p>제12장의 검색 코드가 반환하는 <code>_id</code> 목록을 질문별로 저장하여 <code>runs["candidate"]</code> 대신 입력한다. 정답 <code>gold</code>는 검색 전에 사람이 판정한 문서 ID로 구성해야 평가 누출을 피할 수 있다.</p><pre><code class="language-python"># 예시: 제12장 검색 응답 JSON의 hits를 받았을 때
 # hits = response.json()["hits"]["hits"]
 # ranked_ids = [hit["_id"] for hit in hits]
 # runs["candidate"]["q1"] = ranked_ids
