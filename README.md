@@ -22,6 +22,7 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 - [제12장 — ERP 및 도메인 문서 RAG (HTML)](docs/ch12_erp_domain_rag.html)
 - [제13장 — 검색 평가·출처 검증·성능 개선 (HTML)](docs/ch13_search_evaluation.html)
 - [제14장 — LlamaIndex(Python)와 Spring AI 비교 (HTML)](docs/ch14_llamaindex_spring_ai.html)
+- [제15장 — 통합 RAG 서비스 구축 및 배포 (HTML)](docs/ch15_integrated_rag.html)
 
 ## 과정 목차
 
@@ -41,7 +42,7 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 | 12 | ERP 및 도메인 문서 RAG | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 13 | 검색 평가·출처 검증·성능 개선 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 14 | LlamaIndex(Python)와 Spring AI 비교 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
-| 15 | 통합 RAG 서비스 구축 및 배포 | 예정 |
+| 15 | 통합 RAG 서비스 구축 및 배포 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 
 ### 원칙
 
