@@ -1,0 +1,71 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제13장 검색 평가·출처 검증·성능 개선</title><style>:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#f2f3ef;color:#20212a;font:17px/1.75 system-ui,'Noto Sans KR',sans-serif}header{background:#171922;color:white;padding:64px max(5%,calc((100vw - 1220px)/2))}header h1{font-size:clamp(32px,4.8vw,58px);line-height:1.2;margin:16px 0}header small{color:#ffd34f;letter-spacing:.09em}.layout{max-width:1240px;margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;padding:28px}nav{position:sticky;top:15px;align-self:start;background:white;padding:18px;border:1px solid #ddd;border-radius:12px}nav a{display:block;padding:7px 4px;color:#4938aa;text-decoration:none;font-size:14px}nav a:hover{text-decoration:underline}section{background:white;border:1px solid #ddd;padding:30px;margin-bottom:20px;border-radius:12px}h2{font-size:25px;border-bottom:2px solid #e7e4f7;padding-bottom:12px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f4f7;padding:17px;border-radius:8px;font:14px/1.65 ui-monospace,monospace}code{font-family:ui-monospace,monospace}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left;vertical-align:top}.diagram{background:#f8f6ff;border:1px solid #d7d0f4;border-radius:10px;padding:18px}.lane{padding:12px 0;border-bottom:1px solid #e4ddf9}.lane:last-child{border:0}.boxes{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:8px}.boxes span{background:#eae5ff;border:1px solid #c2b6f2;border-radius:8px;padding:9px 14px}.boxes em{color:#6952b0;font-style:normal}.output{background:#e9f7ee;border-left:5px solid #23845a;padding:18px}.note{background:#fff8dd;border-left:4px solid #c59b20;padding:14px}@media(max-width:850px){.layout{display:block;padding:14px}nav{position:static;margin-bottom:16px}section{padding:20px}header{padding:45px 6%}}</style></head><body><header><small>SPRING AI · VECTOR DB · RAG / CHAPTER 13</small><h1>검색 평가 · 출처 검증<br>성능 개선</h1><p>Ubuntu 24.04 · Python 3 · Elasticsearch 연계 · 60분 실습</p></header><div class="layout"><nav><b>학습 목차</b><a href="#intro">01 · 과제 개요와 입출력</a><a href="#plan">02 · 60분 실습 일정</a><a href="#flow">03 · 전체 동작 구조</a><a href="#metrics">04 · 평가 지표</a><a href="#setup">05 · Ubuntu 24.04 준비</a><a href="#code">06 · 전체 코드: ch13_eval.py</a><a href="#output">07 · 예상 출력과 해설</a><a href="#integration">08 · 실제 Elasticsearch 검색 결과로 교체</a><a href="#sources">09 · 출처 및 답변 검증</a><a href="#check">10 · 오류 점검 및 완료 기준</a></nav><main><section id="intro"><h2>01 · 과제 개요와 입출력</h2><p>제12장의 도메인 문서 검색을 이어받아 <strong>검색 정확도와 출처 연결을 수치로 평가</strong>한다. 실제 서버 없이 실행 가능한 고정 데이터로 평가식을 먼저 검증한 뒤 Elasticsearch 결과에 적용한다.</p><table><tr><th>입력</th><th>출력</th></tr><tr><td>질문 ID, 정답 문서 ID 집합, 검색 순위</td><td>P@3, R@3, MRR, 출처 ID 검사</td></tr><tr><td>선행</td><td>제08장 하이브리드 검색, 제10~12장 RAG</td></tr></table></section><section id="plan"><h2>02 · 60분 실습 일정</h2><table><tr><th>시간</th><th>진행</th></tr><tr><td>0~10분</td><td>평가 기준과 정답 데이터 정의</td></tr><tr><td>10~30분</td><td>Python 평가 스크립트 작성·실행</td></tr><tr><td>30~40분</td><td>검색 개선 전후 비교</td></tr><tr><td>40~50분</td><td>출처 ID 검증과 한계 분석</td></tr><tr><td>50~60분</td><td>Elasticsearch 연계·최종 점검</td></tr></table></section><section id="flow"><h2>03 · 전체 동작 구조</h2><div class="diagram"><div class="lane"><b>평가 데이터 준비</b><div class="boxes"><span>질문 q1~q4</span><em>→</em><span>정답 문서 ID</span></div></div><div class="lane"><b>검색 실행 또는 고정 결과</b><div class="boxes"><span>Baseline 순위</span><em>↘</em><span>평가 엔진</span><em>↗</em><span>Candidate 순위</span></div></div><div class="lane"><b>검증 결과</b><div class="boxes"><span>P@3 / R@3 / MRR</span><em>→</em><span>출처 ID 대조</span><em>→</em><span>개선 판단</span></div></div></div><p>평가 단계는 검색 품질과 생성 답변 품질을 구분한다. 검색 지표가 좋아져도 답변의 사실성이 자동으로 보장되지는 않는다.</p></section><section id="metrics"><h2>04 · 평가 지표</h2><table><tr><th>지표</th><th>뜻</th><th>계산 기준</th></tr><tr><td>Precision@3 (프리시전, 정밀도)</td><td>상위 3건 중 정답 비율</td><td>상위 3건의 정답 수 ÷ 3</td></tr><tr><td>Recall@3 (리콜, 재현율)</td><td>전체 정답을 얼마나 찾았는가</td><td>상위 3건의 정답 수 ÷ 전체 정답 수</td></tr><tr><td>MRR (엠알알, 평균 역순위)</td><td>첫 정답이 얼마나 앞에 있는가</td><td>질문별 첫 정답 순위의 역수를 평균</td></tr></table><p>정답 문서가 없는 질문은 이 실습의 Recall 계산 대상에서 제외한다. 실제 평가에서는 별도 정책을 정해야 한다.</p></section><section id="setup"><h2>05 · Ubuntu 24.04 준비</h2><pre><code>mkdir -p ~/spring-boot-lab/ch13_eval  # 제13장 실습 폴더 생성
+cd ~/spring-boot-lab/ch13_eval       # 실습 폴더 이동
+python3 --version                    # Python 버전 확인
+nano ch13_eval.py                    # 아래 전체 코드를 붙여넣고 저장
+python3 ch13_eval.py                 # 평가 실행</code></pre><div class="note">Python 3 표준 라이브러리만 사용하므로 pip 설치, Docker, Elasticsearch, Ollama 실행이 필요하지 않다. 실제 서비스 연계는 뒤 절에서 선택적으로 진행한다.</div></section><section id="code"><h2>06 · 전체 코드: ch13_eval.py</h2><pre><code class="language-python"># ch13_eval.py — 표준 라이브러리만 사용, 외부 서비스 없이 재현 가능
+from collections import defaultdict
+from statistics import mean
+from time import perf_counter
+
+# 질문별 정답 문서 ID (가상 데이터)
+gold = {
+    "q1": {"tech_uart", "tech_serial"},
+    "q2": {"erp_purchase"},
+    "q3": {"tech_pwm"},
+    "q4": {"erp_finance"},
+}
+# 제12장 검색 결과를 흉내 낸 고정 순위 목록 (실제 검색 아님)
+runs = {
+    "baseline": {
+        "q1": ["tech_pwm", "tech_uart", "erp_purchase"],
+        "q2": ["erp_finance", "tech_pwm", "erp_purchase"],
+        "q3": ["tech_pwm", "tech_uart", "erp_finance"],
+        "q4": ["tech_uart", "erp_finance", "erp_purchase"],
+    },
+    "candidate": {
+        "q1": ["tech_uart", "tech_serial", "tech_pwm"],
+        "q2": ["erp_purchase", "erp_finance", "tech_pwm"],
+        "q3": ["tech_pwm", "tech_uart", "erp_finance"],
+        "q4": ["erp_finance", "erp_purchase", "tech_uart"],
+    },
+}
+
+def precision_at_k(ids, relevant, k=3):
+    # 검색 결과 중 정답 문서 비율 (분모는 k)
+    return sum(doc in relevant for doc in ids[:k]) / k
+
+def recall_at_k(ids, relevant, k=3):
+    # 전체 정답 문서 중 검색된 비율
+    return sum(doc in relevant for doc in ids[:k]) / len(relevant) if relevant else 0.0
+
+def reciprocal_rank(ids, relevant):
+    # 첫 정답 문서가 나타난 순위의 역수
+    return next((1 / rank for rank, doc in enumerate(ids, 1)
+                 if doc in relevant), 0.0)
+
+def evaluate(run):
+    rows = []
+    for qid, relevant in gold.items():
+        ids = run[qid]
+        rows.append((precision_at_k(ids, relevant),
+                     recall_at_k(ids, relevant),
+                     reciprocal_rank(ids, relevant)))
+    return tuple(mean(row[i] for row in rows) for i in range(3))
+
+for name, run in runs.items():
+    p, r, mrr = evaluate(run)
+    print(f"{name:9} P@3={p:.3f} R@3={r:.3f} MRR={mrr:.3f}")
+
+# 출처 검증: 검색된 문서 ID와 답변에 표시한 출처 ID 대조
+retrieved = {"tech_uart", "tech_serial"}
+cited = {"tech_uart", "unknown_source"}
+invalid = cited - retrieved
+print("출처 ID 검사:", "통과" if not invalid else f"실패 {sorted(invalid)}")
+# 주의: ID가 존재해도 답변 내용의 사실성까지 보장하지 않음
+</code></pre><p><strong>코드 풀이:</strong> <code>gold</code>는 정답 집합, <code>runs</code>는 검색 결과 순위다. <code>evaluate()</code>가 각 질문의 지표를 계산한 뒤 평균을 낸다. <code>invalid</code>는 검색 목록에 없는 출처 ID를 검출한다.</p></section><section id="output"><h2>07 · 예상 출력과 해설</h2><div class="output"><b>예상 출력 — 실제 Ubuntu 실행 미검증</b><pre><code>baseline  P@3=0.417 R@3=0.875 MRR=0.542
+candidate P@3=0.417 R@3=1.000 MRR=1.000
+출처 ID 검사: 실패 ['unknown_source']</code></pre></div><p><strong>해설:</strong> Candidate는 첫 정답 문서가 모두 1위에 있어 MRR이 높다. P@3는 두 실행 모두 5개의 정답을 총 12개 결과에서 찾아 동일하다. Baseline은 q1에서 두 정답 중 하나만 검색해 R@3 평균이 낮다. 출처 검사 실패는 <code>unknown_source</code>가 검색 결과에 없기 때문이다.</p></section><section id="integration"><h2>08 · 실제 Elasticsearch 검색 결과로 교체</h2><p>제12장의 검색 코드가 반환하는 <code>_id</code> 목록을 질문별로 저장하여 <code>runs["candidate"]</code> 대신 입력한다. 정답 <code>gold</code>는 검색 전에 사람이 판정한 문서 ID로 구성해야 평가 누출을 피할 수 있다.</p><pre><code class="language-python"># 예시: 제12장 검색 응답 JSON의 hits를 받았을 때
+# hits = response.json()["hits"]["hits"]
+# ranked_ids = [hit["_id"] for hit in hits]
+# runs["candidate"]["q1"] = ranked_ids
+# 실제 서버 응답을 연결한 후에만 측정값을 '실측'으로 표기</code></pre><p>제12장 인덱스의 문서 ID와 정답 데이터 ID가 다르면 평가 전에 매핑한다. 3차원 교육용 벡터와 1024차원 bge-m3 벡터를 같은 인덱스에 혼합하지 않는다.</p></section><section id="sources"><h2>09 · 출처 및 답변 검증</h2><p>1차 검증은 답변에 기재된 출처 ID가 검색 결과에 포함되는지 확인하는 것이다. 2차 검증은 해당 문서의 실제 문장이 답변 주장을 뒷받침하는지 사람 또는 별도 평가기로 판정한다. <strong>출처 ID 일치만으로 사실성을 확정하지 않는다.</strong></p><table><tr><th>검증</th><th>통과 조건</th></tr><tr><td>출처 존재</td><td>인용 ID가 검색 결과에 포함</td></tr><tr><td>근거 적합</td><td>원문이 답변 주장을 직접 지지</td></tr><tr><td>권한</td><td>사용자에게 허용된 문서만 인용</td></tr><tr><td>추적성</td><td>원본 파일·페이지·청크를 식별 가능</td></tr></table></section><section id="check"><h2>10 · 오류 점검 및 완료 기준</h2><table><tr><th>현상</th><th>확인</th></tr><tr><td>python3 명령 없음</td><td>Ubuntu Python 설치 여부 확인</td></tr><tr><td>출력 수치 불일치</td><td>정답 집합과 결과 순위의 문서 ID 오탈자 확인</td></tr><tr><td>MRR이 낮음</td><td>첫 정답 문서의 순위 확인</td></tr><tr><td>출처 실패</td><td>검색 결과 ID와 답변 출처 ID 비교</td></tr></table><p><strong>완료 기준:</strong> 두 검색 방식의 P@3/R@3/MRR을 설명할 수 있고, 잘못된 출처 ID를 찾아낼 수 있다. 검색 품질 개선과 답변 품질 개선을 별개로 기록한다.</p><p><strong>다음 장:</strong> 제14장 — LlamaIndex(Python)와 Spring AI 비교.</p></section><footer><p>제13장 · 예상 결과와 실측 결과를 구분하여 기록 · 교육용 가상 데이터</p></footer></main></div></body></html>
