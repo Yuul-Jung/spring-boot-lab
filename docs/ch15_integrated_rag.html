@@ -1,0 +1,119 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>제15장 통합 RAG 서비스 구축 및 배포</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f2f3ef;color:#20212a;font:17px/1.75 system-ui,'Noto Sans KR',sans-serif}header{background:#171922;color:#fff;padding:62px max(5%,calc((100vw - 1220px)/2))}header h1{font-size:clamp(32px,4.8vw,58px);line-height:1.2;margin:15px 0}header small{color:#ffd34f;letter-spacing:.08em}.layout{max-width:1240px;margin:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:26px;padding:28px}nav{position:sticky;top:15px;align-self:start;background:#fff;padding:18px;border:1px solid #ddd;border-radius:12px;max-height:90vh;overflow:auto}nav a{display:block;padding:5px 3px;color:#4938aa;text-decoration:none;font-size:14px}section{background:#fff;border:1px solid #ddd;padding:30px;margin-bottom:20px;border-radius:12px}h2{font-size:25px;border-bottom:2px solid #e7e4f7;padding-bottom:12px}h3{font-size:19px;margin-bottom:6px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f4f7;padding:17px;border-radius:8px;font:14px/1.65 ui-monospace,monospace}code{font-family:ui-monospace,monospace}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:10px;text-align:left;vertical-align:top}.diagram{background:#f8f6ff;border:1px solid #d7d0f4;border-radius:10px;padding:18px}.row{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0}.row span{background:#eae5ff;border:1px solid #c2b6f2;border-radius:8px;padding:10px 14px}.row b{color:#6952b0}.output{background:#e9f7ee;border-left:4px solid #32956b}@media(max-width:850px){.layout{display:block;padding:12px}nav{position:static;margin-bottom:16px}section{padding:18px}}</style></head><body><header><small>SPRING AI · VECTOR DB · RAG | CHAPTER 15 / 15</small><h1>통합 RAG 서비스 구축 및 배포</h1><p>Ubuntu 24.04 · Java 21 · Spring Boot · Spring AI · Ollama · Elasticsearch</p><p>60분 따라하기 실습 · 예상 출력과 코드 풀이 포함</p></header><div class="layout"><nav aria-label="목차"><strong>제15장 목차</strong><a href="#s1">01 개요와 60분 계획</a><a href="#s2">02 입력·출력 정의</a><a href="#s3">03 전체 동작 구조</a><a href="#s4">04 기존 기능과 추가 기능</a><a href="#s5">05 환경 확인</a><a href="#s6">06 프로젝트 구성</a><a href="#s7">07 Gradle 의존성</a><a href="#s8">08 애플리케이션 설정</a><a href="#s9">09 진입점</a><a href="#s10">10 통합 컨트롤러</a><a href="#s11">11 실행 및 요청</a><a href="#s12">12 검증과 정리</a><a href="#s13">13 오류 점검과 보안</a><a href="#s14">14 최종 확인과 다음 단계</a><a href="../README.md">전체 15장 목차</a></nav><main><section id="s1"><h2>01. 개요와 60분 계획</h2><p>01~14장의 문서 적재·임베딩·검색·출처 검증을 하나의 HTTP 서비스로 연결합니다. <strong>10분 환경 확인 → 10분 프로젝트 구성 → 20분 구현 → 15분 실행 → 5분 점검</strong> 순서로 진행합니다.</p></section><section id="s2"><h2>02. 입력·출력 정의</h2><table><tr><th>구분</th><th>형식</th><th>의미</th></tr><tr><td>입력</td><td>GET /api/ask?q=...</td><td>한국어 질문</td></tr><tr><td>적재</td><td>POST /api/seed</td><td>교육용 기술 문서 2건</td></tr><tr><td>출력</td><td>JSON answer, sources</td><td>근거 기반 답변과 출처</td></tr></table></section><section id="s3"><h2>03. 전체 동작 구조</h2><div class="diagram"><div class="row"><span>사용자 질문</span><b>→</b><span>Spring Boot API</span><b>→</b><span>Spring AI 검색</span></div><div class="row"><span>Ollama bge-m3</span><b>↔</b><span>Elasticsearch 벡터 인덱스</span><b>→</b><span>근거 문서</span></div><div class="row"><span>근거 + 질문</span><b>→</b><span>Ollama qwen2.5:3b</span><b>→</b><span>답변 + 출처</span></div></div><p>문서 적재 시 임베딩과 검색 시 질문 임베딩은 동일 모델을 사용합니다. 09~12장의 데이터와는 별도 <code>rag-ch15</code> 인덱스로 충돌을 방지합니다.</p></section><section id="s4"><h2>04. 기존 기능과 추가 기능</h2><table><tr><th>재사용</th><th>이번 장 추가</th></tr><tr><td>Ollama, Elasticsearch, 벡터 검색, 출처 메타데이터</td><td>HTTP 엔드포인트, 질문 검증, 근거 결합, 통합 응답</td></tr></table><p>기존 01~14장 소스는 수정하지 않습니다. 교육용 단일 서버 구성으로, 공개 운영 서비스의 인증·권한 관리·TLS·감사 로깅을 구현한 것은 아닙니다.</p></section><section id="s5"><h2>05. 환경 확인</h2><h3>코드</h3><pre><code class="language-bash">java -version
+docker compose version
+curl -s http://localhost:11434/api/tags
+curl -s http://localhost:9200</code></pre><h3>예상 출력</h3><pre class="output">Java 21, Docker Compose 버전, Ollama 모델 목록, Elasticsearch 상태 JSON이 표시됩니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>기존 04·07·10장의 서비스를 재사용합니다. 연결 실패 시 해당 장의 설정부터 확인합니다.</p></section><section id="s6"><h2>06. 프로젝트 구성</h2><h3>코드</h3><pre><code class="language-text">rag-service/
+ ├─ build.gradle
+ └─ src/main/
+    ├─ java/com/example/rag/
+    │  ├─ RagApplication.java
+    │  └─ RagController.java
+    └─ resources/application.yml</code></pre><h3>예상 출력</h3><pre class="output">프로젝트 폴더 및 3개 소스 파일이 준비됩니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>기존 제10장 프로젝트를 복제해 진행하며 원본을 덮어쓰지 않습니다.</p></section><section id="s7"><h2>07. Gradle 의존성</h2><h3>코드</h3><pre><code class="language-groovy">plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.5'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+group = 'com.example'
+version = '0.0.1-SNAPSHOT'
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+repositories { mavenCentral() }
+ext { set('springAiVersion', '1.0.0') }
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.ai:spring-ai-starter-model-ollama'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-elasticsearch'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+dependencyManagement {
+    imports { mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}" }
+}
+tasks.named('test') { useJUnitPlatform() }</code></pre><h3>예상 출력</h3><pre class="output">Gradle 의존성 다운로드가 완료됩니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>Spring Boot 3.4.x와 Spring AI 1.0.x 조합을 예시로 고정했습니다. 실제 저장소의 10장 설정과 충돌하면 검증된 버전을 우선합니다.</p></section><section id="s8"><h2>08. 애플리케이션 설정</h2><h3>코드</h3><pre><code class="language-yaml">server:
+  port: 8080
+spring:
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5:3b
+      embedding:
+        options:
+          model: bge-m3
+    vectorstore:
+      elasticsearch:
+        index-name: rag-ch15
+        initialize-schema: true
+        dimensions: 1024
+        similarity: cosine
+        uris: http://localhost:9200</code></pre><h3>예상 출력</h3><pre class="output">설정 파일이 읽히고 8080 포트로 서비스가 시작될 준비를 합니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>Elasticsearch 인증이 비활성화된 로컬 전용 환경을 전제로 합니다. bge-m3 벡터 차원 1024와 인덱스 차원을 일치시킵니다. 버전에 따른 설정 키는 실제 기동 로그로 확인해야 합니다.</p></section><section id="s9"><h2>09. 진입점</h2><h3>코드</h3><pre><code class="language-java">package com.example.rag;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+@SpringBootApplication
+public class RagApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(RagApplication.class, args);
+    }
+}</code></pre><h3>예상 출력</h3><pre class="output">Spring Boot 애플리케이션이 기동됩니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>컨트롤러와 같은 패키지에 배치하여 컴포넌트 검색 범위를 단순화합니다.</p></section><section id="s10"><h2>10. 통합 컨트롤러</h2><h3>코드</h3><pre><code class="language-java">package com.example.rag;
+import java.util.List;
+import java.util.Map;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api")
+public class RagController {
+    private final VectorStore store;
+    private final ChatClient chat;
+
+    public RagController(VectorStore store, ChatClient.Builder builder) {
+        this.store = store;
+        this.chat = builder.build();
+    }
+
+    // 교육용 고정 문서: 실제 운영 시 인증과 적재 검증 필수
+    @PostMapping("/seed")
+    public Map&lt;String, Object&gt; seed() {
+        store.add(List.of(
+            new Document("UART는 비동기 직렬 통신 방식이며 TX와 RX를 사용합니다.",
+                Map.of("source", "uart-note", "access", "public")),
+            new Document("PWM은 듀티비를 조절해 평균 출력 전력을 제어합니다.",
+                Map.of("source", "pwm-note", "access", "public"))
+        ));
+        return Map.of("inserted", 2);
+    }
+
+    @GetMapping("/ask")
+    public Map&lt;String, Object&gt; ask(@RequestParam String q) {
+        if (q.isBlank() || q.length() &gt; 300)
+            throw new IllegalArgumentException("질문 길이는 1~300자입니다.");
+        List&lt;Document&gt; hits = store.similaritySearch(
+            SearchRequest.builder().query(q).topK(3).build());
+        if (hits == null || hits.isEmpty())
+            return Map.of("answer", "검색된 근거가 없습니다.", "sources", List.of());
+        StringBuilder context = new StringBuilder();
+        for (Document d : hits)
+            context.append("[").append(d.getMetadata().get("source"))
+                   .append("] ").append(d.getText()).append("\n");
+        String answer = chat.prompt()
+            .user("다음 근거만 이용해 한국어로 답하세요. 근거가 부족하면 모른다고 하세요.\n"
+                + context + "\n질문: " + q)
+            .call().content();
+        return Map.of("answer", answer == null ? "" : answer,
+            "sources", hits.stream().map(d -&gt;
+                String.valueOf(d.getMetadata().get("source"))).distinct().toList());
+    }
+}</code></pre><h3>예상 출력</h3><pre class="output">/api/seed 및 /api/ask 엔드포인트가 등록됩니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>검색된 문서만 프롬프트에 포함하고 출처 목록을 별도로 반환합니다. 모델 답변이 출처를 실제로 충실히 따르는지는 추가 평가가 필요합니다.</p></section><section id="s11"><h2>11. 실행 및 요청</h2><h3>코드</h3><pre><code class="language-bash"># 프로젝트 루트에서 실행
+./gradlew bootRun
+
+# 별도 터미널에서 교육용 문서 적재
+curl -X POST http://localhost:8080/api/seed
+
+# URL 인코딩을 curl에 맡겨 질문
+curl -G --data-urlencode 'q=PWM은 무엇인가요?' \
+  http://localhost:8080/api/ask</code></pre><h3>예상 출력</h3><pre class="output">{"inserted":2} 이후 {"answer":"PWM은 ...","sources":["pwm-note",...]} 형태의 JSON이 반환될 수 있습니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>실제 검색 순위와 답변 문장은 모델 및 인덱스 상태에 따라 달라집니다. seed를 반복 호출하면 중복 문서가 생길 수 있으므로 1회만 실행합니다.</p></section><section id="s12"><h2>12. 검증과 정리</h2><h3>코드</h3><pre><code class="language-bash"># HTTP 응답 상태 확인
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -G --data-urlencode 'q=UART 통신은?' http://localhost:8080/api/ask
+# Elasticsearch 인덱스 확인
+curl -s 'http://localhost:9200/_cat/indices/rag-ch15?v'</code></pre><h3>예상 출력</h3><pre class="output">정상 구성에서는 HTTP 200과 rag-ch15 인덱스 정보가 표시됩니다.</pre><h3>코드 풀이 — 이 코드가 무엇을 하는가</h3><p>200 응답만으로 검색 품질이 입증되지는 않습니다. 제13장의 출처 일치·MRR 평가를 재적용합니다.</p></section><section id="s13"><h2>13. 오류 점검과 보안</h2><table><tr><th>증상</th><th>확인</th></tr><tr><td>연결 거부</td><td>11434·9200·8080 포트 및 컨테이너 실행 상태 확인</td></tr><tr><td>벡터 차원 오류</td><td>인덱스 dimensions와 실제 임베딩 길이 비교</td></tr><tr><td>의존성 컴파일 오류</td><td>Spring AI BOM 및 API 버전 재확인</td></tr><tr><td>답변에 근거 없음</td><td>seed 1회 실행, 색인 및 검색 결과 확인</td></tr></table><p><strong>보안:</strong> 예제에는 비밀번호·토큰·개인 경로를 포함하지 않았습니다. Elasticsearch 무인증 설정은 localhost 실습에만 사용하며 외부 포트를 공개하지 마세요. <code>/api/seed</code>는 공개 배포 전에 제거하거나 관리자 인증을 적용해야 합니다.</p></section><section id="s14"><h2>14. 최종 확인과 다음 단계</h2><p>완료 기준: (1) 앱 기동, (2) 문서 2건 적재, (3) 질문 응답 JSON, (4) 출처 확인, (5) 제13장 평가 지표 재사용. 이 문서의 출력은 모두 <strong>예상 결과</strong>이며 실제 Ubuntu 실행·Java 컴파일·브라우저 렌더링은 검증되지 않았습니다.</p><p>추가 확장: 제11장 PDF 적재를 연결하고, 접근 권한 검사를 검색 이전에 강제하며, 제13장의 검색 품질 측정을 CI에 추가합니다.</p></section></main></div></body></html>
