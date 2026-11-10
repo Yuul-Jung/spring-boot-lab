@@ -17,6 +17,7 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 - [제07장 — Elasticsearch 기초 및 인덱스 (HTML)](docs/ch07_elasticsearch_basics.html)
 - [제08장 — Elasticsearch 벡터·하이브리드 검색 (HTML)](docs/ch08_elasticsearch_vector_hybrid.html)
 - [제09장 — RAG 문서 적재·분할·메타데이터 (HTML)](docs/ch09_document_ingestion.html)
+- [제10장 — Spring AI 문서 검색 및 답변 생성 (HTML)](docs/ch10_spring_ai_rag.html)
 
 ## 과정 목차
 
@@ -31,7 +32,7 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 | 07 | Elasticsearch 기초 및 인덱스 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 08 | Elasticsearch 벡터·하이브리드 검색 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 09 | RAG 문서 적재·분할·메타데이터 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
-| 10 | Spring AI 문서 검색 및 답변 생성 | 예정 |
+| 10 | Spring AI 문서 검색 및 답변 생성 | **HTML 학습안내서 게시 / 사용자 실행 미검증** |
 | 11 | PDF 기반 RAG 구현 | 예정 |
 | 12 | ERP 및 도메인 문서 RAG | 예정 |
 | 13 | 검색 평가·출처 검증·성능 개선 | 예정 |
