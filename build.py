@@ -9,7 +9,8 @@
 실행(Ubuntu):
   python3 -m venv .venv && source .venv/bin/activate   # 가상환경 준비
   python -m pip install mistune                        # Markdown 변환기 설치
-  python build.py                                      # 사이트 생성
+  python build.py                                      # 사이트 생성 (course.json)
+  python build.py other_course.json                    # 같은 저장소의 다른 과정
 기준 표준: https://github.com/Yuul-Jung/rule_md/blob/main/web/education-html/STANDARD.md
 """
 import base64
@@ -17,18 +18,24 @@ import html
 import json
 import os
 import re
+import urllib.parse
 from pathlib import Path
+
+import sys
 
 import mistune
 
 ROOT = Path(__file__).resolve().parent
-CONFIG = json.loads((ROOT / 'course.json').read_text(encoding='utf-8'))
+CONFIG_FILE = ROOT / (sys.argv[1] if len(sys.argv) > 1 else 'course.json')  # 과정이 여럿이면: python build.py 다른과정.json
+CONFIG = json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
 OUT = (ROOT / CONFIG.get('out', '.')).resolve()
 ASSETS = ROOT / CONFIG.get('assets', 'assets/edu')
 IMAGE = base64.b64encode((ASSETS / 'hero-bookshelf.jpg').read_bytes()).decode('ascii')
 CSS = (ASSETS / 'site.css').read_text(encoding='utf-8')
 CSS = re.sub(r"url\((['\"])hero-bookshelf\.jpg\1\)", f"url('data:image/jpeg;base64,{IMAGE}')", CSS)
 CSS += '\n' + (ASSETS / 'chapter.css').read_text(encoding='utf-8')
+for extra in CONFIG.get('extra_css', []):  # 과정 고유 스타일(원본 교재 스타일을 .sec-body 범위로 한정한 사본)
+    CSS += '\n' + (ROOT / extra).read_text(encoding='utf-8')
 SCRIPT = (ASSETS / 'site.js').read_text(encoding='utf-8')
 RULE_URL = 'https://github.com/Yuul-Jung/rule_md/tree/main/web/education-html'
 SKIP = set(CONFIG.get('skip_sections', ['목차', '차례', 'Contents', 'Table of Contents']))
@@ -99,6 +106,35 @@ def strip_number(title):
     return re.sub(r'^(?:\d+(?:\.\d+)*[.)]?(?:\s*[|·:—-])?|\[\d+\]|제?\d+절)\s+', '', title).strip() or title
 
 
+def slug_variants(title):
+    """원고 안 링크가 가리키던 옛 제목 앵커(GitHub·pandoc 방식) 후보."""
+    plain = html.unescape(re.sub(r'<[^>]+>', '', title)).strip()
+    out = set()
+    for s in (plain, strip_number(plain)):
+        g = re.sub(r'[^\w\- ]', '', s.lower()).replace(' ', '-')
+        out |= {g, g.strip('-'), re.sub(r'^[\d\-]+', '', g)}
+    return {x for x in out if x}
+
+
+def nav_only(body_html):
+    """이전/다음·목차 링크만 있는 절(표준 탐색과 중복)인지."""
+    if '<a ' not in body_html:
+        return False
+    rest = re.sub(r'<a\b.*?</a>', '', body_html, flags=re.S)
+    rest = re.sub(r'<[^>]+>|[\s·|/\-—]', '', rest)
+    return len(rest) < 6
+
+
+def drop_local_toc(fragment):
+    """항목이 모두 같은 쪽 앵커 링크뿐인 목록(원고 자체 목차)은 좌측 탐색과 중복이므로 뺀다."""
+    def repl(m):
+        items = re.findall(r'<li>(.*?)</li>', m.group(0), re.S)
+        if len(items) >= 3 and all(re.fullmatch(r'\s*<a href="#[^"]+">[^<]*</a>\s*', i) for i in items):
+            return ''
+        return m.group(0)
+    return re.sub(r'<(ul|ol)>.*?</\1>', repl, fragment, flags=re.S)
+
+
 def split_sections(text, ch):
     """원고를 (절 제목, HTML) 목록으로 나눈다. 첫 '##' 앞 내용은 00 개요 절이 된다."""
     is_md = ch['source'].endswith('.md')
@@ -116,7 +152,8 @@ def split_sections(text, ch):
     intro, rest = parts[0].strip(), parts[1:]
     raw = [(rest[i].strip(), rest[i + 1].strip()) for i in range(0, len(rest), 2)]
     raw = [(t, b) for t, b in raw if strip_number(t) not in SKIP and t not in SKIP]
-    src_dir = os.path.dirname(os.path.join(ROOT, ch['source']))
+    # 'base': 원고를 옮겨 왔을 때 원래 HTML이 있던 폴더 — 본문의 상대 경로는 그 위치 기준
+    src_dir = os.path.join(ROOT, ch['base']) if ch.get('base') else os.path.dirname(os.path.join(ROOT, ch['source']))
     def render(body):
         if is_md:
             for k, v in guard.items():
@@ -125,14 +162,25 @@ def split_sections(text, ch):
         return fix_links(body, src_dir)
     secs = []
     intro_title = ch.get('intro_title', '개요')
-    intro_html = render(intro) if intro else ''
+    intro_html = drop_local_toc(render(intro)) if intro else ''
     if not intro_html.strip():
         intro_html = f'<p>{escape(ch["subtitle"])}</p>'
     secs.append((intro_title, intro_html))
     for t, b in raw:
         title = strip_number(re.sub(r'<[^>]+>', '', MARKDOWN(t)).strip() if is_md else t)
-        secs.append((html.unescape(title), render(b)))
-    return secs
+        body = render(b)
+        if nav_only(body):
+            continue
+        secs.append((html.unescape(title), body, slug_variants(t)))
+    # 원고 안 옛 제목 앵커(#01--제목 등) → 새 절 번호(#sNN)
+    alias = {}
+    for i, s in enumerate(secs):
+        for v in (s[2] if len(s) > 2 else ()):
+            alias.setdefault(v, f's{i:02d}')
+    def re_anchor(m):
+        key = urllib.parse.unquote(m.group(1)).lower()
+        return f'href="#{alias[key]}"' if key in alias else m.group(0)
+    return [(s[0], re.sub(r'href="#([^"]+)"', re_anchor, s[1])) for s in secs]
 
 
 def page(title, kicker, desc, chips, body, chapter_id=''):
