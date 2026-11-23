@@ -1,0 +1,315 @@
+{
+ "site_title": "Spring Boot AI · Vector DB · RAG",
+ "site_subtitle": "",
+ "course_code": "SPRING AI RAG LAB",
+ "version": "v01",
+ "out": "docs",
+ "site_description": "Ubuntu 24.04 LTS에서 IntelliJ IDEA + Java 21 + Spring Boot / Spring AI를 기반으로 임베딩, 벡터 검색, Elasticsearch 하이브리드 검색을 거쳐 PDF·도메인 문서 RAG와 통합 서비스까지 단계적으로 구현하는 실습 안내서입니다.",
+ "index_chips": [
+  "15개 장",
+  "Ubuntu 24.04",
+  "Java 21 · Spring AI",
+  "Ollama · Elasticsearch"
+ ],
+ "overview_cards": [
+  {
+   "label": "실행 검증",
+   "value": "미검증",
+   "note": "사용자 Ubuntu PC에서 확인 필요"
+  }
+ ],
+ "notes": [
+  "코드와 출력은 교육용 예상 결과이며, 개인 Ubuntu PC에서 설치·실행 검증은 아직 진행하지 않았습니다.",
+  "비밀번호·API 키·토큰·개인 경로·자료 원본은 공개 저장소에 올리지 않습니다."
+ ],
+ "parts": [
+  {
+   "title": "Ⅰ. 기반",
+   "subtitle": "개발환경 · Spring AI · 임베딩",
+   "chapters": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "title": "Ⅱ. 벡터 검색",
+   "subtitle": "메모리 · pgvector · Elasticsearch",
+   "chapters": [
+    5,
+    6,
+    7,
+    8
+   ]
+  },
+  {
+   "title": "Ⅲ. RAG 구현",
+   "subtitle": "적재 · 답변 생성 · PDF · 도메인",
+   "chapters": [
+    9,
+    10,
+    11,
+    12
+   ]
+  },
+  {
+   "title": "Ⅳ. 평가와 통합",
+   "subtitle": "평가 · 비교 · 서비스",
+   "chapters": [
+    13,
+    14,
+    15
+   ]
+  }
+ ],
+ "extra_links": [
+  {
+   "text": "공식 문서: Spring AI",
+   "href": "https://docs.spring.io/spring-ai/reference/"
+  },
+  {
+   "text": "공식 문서: Ollama (Linux)",
+   "href": "https://ollama.com/download/linux"
+  },
+  {
+   "text": "공식 문서: Elasticsearch",
+   "href": "https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html"
+  }
+ ],
+ "chapters": [
+  {
+   "id": "ch01",
+   "number": 1,
+   "title": "전체 학습 테크트리 및 Ubuntu 개발환경 구축",
+   "nav_title": "테크트리·개발환경",
+   "subtitle": "학습 테크트리 → 설치 상태 조사 → Java·IntelliJ·Ollama·Docker 설치",
+   "slug": "ch01_ubuntu_development_environment",
+   "version": "v01",
+   "source": "docs/ch01_ubuntu_development_environment.md",
+   "tags": [
+    "Ubuntu 24.04",
+    "Java 21",
+    "Docker"
+   ]
+  },
+  {
+   "id": "ch02",
+   "number": 2,
+   "title": "IntelliJ에서 Spring Boot + Spring AI 시작",
+   "nav_title": "Spring Boot + Spring AI",
+   "subtitle": "프로젝트 생성 → Gradle 의존성 → Ollama 연결 → 빌드·실행",
+   "slug": "ch02_spring_boot_spring_ai",
+   "version": "v01",
+   "source": "content/ch02.html",
+   "tags": [
+    "Spring Boot",
+    "Spring AI",
+    "Ollama"
+   ],
+   "legacy_file": "docs/ch02_spring_boot_spring_ai.html"
+  },
+  {
+   "id": "ch03",
+   "number": 3,
+   "title": "벡터·임베딩·코사인 유사도",
+   "nav_title": "벡터·코사인 유사도",
+   "subtitle": "벡터 방향 → 코사인 유사도 수식 → Java 직접 구현",
+   "slug": "ch03_vector_embedding_cosine",
+   "version": "v01",
+   "source": "content/ch03.html",
+   "tags": [
+    "벡터",
+    "임베딩",
+    "코사인 유사도"
+   ],
+   "legacy_file": "docs/ch03_vector_embedding_cosine.html"
+  },
+  {
+   "id": "ch04",
+   "number": 4,
+   "title": "Ollama 로컬 LLM과 임베딩 모델",
+   "nav_title": "Ollama 로컬 LLM",
+   "subtitle": "모델 서버 실행 → 답변 생성 API → 임베딩 API",
+   "slug": "ch04_ollama_local_llm_embedding",
+   "version": "v01",
+   "source": "content/ch04.html",
+   "tags": [
+    "Ollama",
+    "qwen2.5",
+    "bge-m3"
+   ],
+   "legacy_file": "docs/ch04_ollama_local_llm_embedding.html"
+  },
+  {
+   "id": "ch05",
+   "number": 5,
+   "title": "메모리 벡터 검색",
+   "nav_title": "메모리 벡터 검색",
+   "subtitle": "임베딩 저장 → 질문 벡터 → 유사도 순 검색",
+   "slug": "ch05_memory_vector_search",
+   "version": "v01",
+   "source": "content/ch05.html",
+   "tags": [
+    "벡터 검색",
+    "Java 21"
+   ],
+   "legacy_file": "docs/ch05_memory_vector_search.html"
+  },
+  {
+   "id": "ch06",
+   "number": 6,
+   "title": "PostgreSQL·pgvector 영속 벡터 검색",
+   "nav_title": "PostgreSQL·pgvector",
+   "subtitle": "Docker 벡터 DB → SQL 검색 → JDBC 연동 → 영속성 확인",
+   "slug": "ch06_postgresql_pgvector",
+   "version": "v01",
+   "source": "content/ch06.html",
+   "tags": [
+    "PostgreSQL",
+    "pgvector",
+    "Docker"
+   ],
+   "legacy_file": "docs/ch06_postgresql_pgvector.html"
+  },
+  {
+   "id": "ch07",
+   "number": 7,
+   "title": "Elasticsearch 기초 및 인덱스",
+   "nav_title": "Elasticsearch 기초",
+   "subtitle": "설치 → 매핑 → 문서 색인 → 키워드 검색",
+   "slug": "ch07_elasticsearch_basics",
+   "version": "v01",
+   "source": "content/ch07.html",
+   "tags": [
+    "Elasticsearch",
+    "색인",
+    "매핑"
+   ],
+   "legacy_file": "docs/ch07_elasticsearch_basics.html"
+  },
+  {
+   "id": "ch08",
+   "number": 8,
+   "title": "Elasticsearch 벡터·하이브리드 검색",
+   "nav_title": "벡터·하이브리드 검색",
+   "subtitle": "BM25 → kNN 벡터 검색 → RRF 순위 결합",
+   "slug": "ch08_elasticsearch_vector_hybrid",
+   "version": "v01",
+   "source": "content/ch08.html",
+   "tags": [
+    "kNN",
+    "BM25",
+    "RRF"
+   ],
+   "legacy_file": "docs/ch08_elasticsearch_vector_hybrid.html"
+  },
+  {
+   "id": "ch09",
+   "number": 9,
+   "title": "RAG 문서 적재·분할·메타데이터",
+   "nav_title": "문서 적재·분할",
+   "subtitle": "원문 → 청크 분할 → 메타데이터 → 임베딩 색인",
+   "slug": "ch09_document_ingestion",
+   "version": "v01",
+   "source": "content/ch09.html",
+   "tags": [
+    "청크",
+    "메타데이터",
+    "RAG"
+   ],
+   "legacy_file": "docs/ch09_document_ingestion.html"
+  },
+  {
+   "id": "ch10",
+   "number": 10,
+   "title": "Spring AI 문서 검색 및 답변 생성",
+   "nav_title": "Spring AI RAG",
+   "subtitle": "근거 검색 → 프롬프트 구성 → Ollama 답변 생성",
+   "slug": "ch10_spring_ai_rag",
+   "version": "v01",
+   "source": "content/ch10.html",
+   "tags": [
+    "Spring AI",
+    "RAG"
+   ],
+   "legacy_file": "docs/ch10_spring_ai_rag.html"
+  },
+  {
+   "id": "ch11",
+   "number": 11,
+   "title": "PDF 기반 RAG 구현",
+   "nav_title": "PDF RAG",
+   "subtitle": "PDF 텍스트 추출 → 페이지 출처 색인 → 답변",
+   "slug": "ch11_pdf_rag",
+   "version": "v01",
+   "source": "content/ch11.html",
+   "tags": [
+    "PDF",
+    "pypdf",
+    "출처 추적"
+   ],
+   "legacy_file": "docs/ch11_pdf_rag.html"
+  },
+  {
+   "id": "ch12",
+   "number": 12,
+   "title": "ERP 및 도메인 문서 RAG",
+   "nav_title": "ERP·도메인 RAG",
+   "subtitle": "도메인 문서 → 메타데이터 필터 → 검색",
+   "slug": "ch12_erp_domain_rag",
+   "version": "v01",
+   "source": "content/ch12.html",
+   "tags": [
+    "ERP",
+    "도메인 RAG"
+   ],
+   "legacy_file": "docs/ch12_erp_domain_rag.html"
+  },
+  {
+   "id": "ch13",
+   "number": 13,
+   "title": "검색 평가·출처 검증·성능 개선",
+   "nav_title": "검색 평가",
+   "subtitle": "평가 질문셋 → 지표 계산 → 출처 검증 → 개선",
+   "slug": "ch13_search_evaluation",
+   "version": "v01",
+   "source": "content/ch13.html",
+   "tags": [
+    "평가",
+    "출처 검증"
+   ],
+   "legacy_file": "docs/ch13_search_evaluation.html"
+  },
+  {
+   "id": "ch14",
+   "number": 14,
+   "title": "LlamaIndex(Python)와 Spring AI 비교",
+   "nav_title": "LlamaIndex 비교",
+   "subtitle": "같은 RAG를 LlamaIndex와 Spring AI로 비교",
+   "slug": "ch14_llamaindex_spring_ai",
+   "version": "v01",
+   "source": "content/ch14.html",
+   "tags": [
+    "LlamaIndex",
+    "Python"
+   ],
+   "legacy_file": "docs/ch14_llamaindex_spring_ai.html"
+  },
+  {
+   "id": "ch15",
+   "number": 15,
+   "title": "통합 RAG 서비스 구축 및 배포",
+   "nav_title": "통합 RAG 서비스",
+   "subtitle": "전체 연결 → 설정 → 실행 → 배포 점검",
+   "slug": "ch15_integrated_rag",
+   "version": "v01",
+   "source": "content/ch15.html",
+   "tags": [
+    "통합",
+    "배포"
+   ],
+   "legacy_file": "docs/ch15_integrated_rag.html"
+  }
+ ]
+}

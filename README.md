@@ -8,21 +8,23 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 
 ## 학습안내서
 
-- [제01장 — 전체 학습 테크트리 및 Ubuntu 개발환경 구축](docs/ch01_ubuntu_development_environment.md)
-- [제02장 — IntelliJ에서 Spring Boot + Spring AI 시작 (HTML)](docs/ch02_spring_boot_spring_ai.html)
-- [제03장 — 벡터·임베딩·코사인 유사도 (HTML)](docs/ch03_vector_embedding_cosine.html)
-- [제04장 — Ollama 로컬 LLM과 임베딩 모델 (HTML)](docs/ch04_ollama_local_llm_embedding.html)
-- [제05장 — 메모리 벡터 검색 (HTML)](docs/ch05_memory_vector_search.html)
-- [제06장 — PostgreSQL·pgvector 영속 벡터 검색 (HTML)](docs/ch06_postgresql_pgvector.html)
-- [제07장 — Elasticsearch 기초 및 인덱스 (HTML)](docs/ch07_elasticsearch_basics.html)
-- [제08장 — Elasticsearch 벡터·하이브리드 검색 (HTML)](docs/ch08_elasticsearch_vector_hybrid.html)
-- [제09장 — RAG 문서 적재·분할·메타데이터 (HTML)](docs/ch09_document_ingestion.html)
-- [제10장 — Spring AI 문서 검색 및 답변 생성 (HTML)](docs/ch10_spring_ai_rag.html)
-- [제11장 — PDF 기반 RAG 구현 (HTML)](docs/ch11_pdf_rag.html)
-- [제12장 — ERP 및 도메인 문서 RAG (HTML)](docs/ch12_erp_domain_rag.html)
-- [제13장 — 검색 평가·출처 검증·성능 개선 (HTML)](docs/ch13_search_evaluation.html)
-- [제14장 — LlamaIndex(Python)와 Spring AI 비교 (HTML)](docs/ch14_llamaindex_spring_ai.html)
-- [제15장 — 통합 RAG 서비스 구축 및 배포 (HTML)](docs/ch15_integrated_rag.html)
+**[전체 학습 안내서 INDEX 열기](docs/index.html)**
+
+- [제01장 — 전체 학습 테크트리 및 Ubuntu 개발환경 구축](docs/ch01_ubuntu_development_environment_v01.html)
+- [제02장 — IntelliJ에서 Spring Boot + Spring AI 시작 (HTML)](docs/ch02_spring_boot_spring_ai_v01.html)
+- [제03장 — 벡터·임베딩·코사인 유사도 (HTML)](docs/ch03_vector_embedding_cosine_v01.html)
+- [제04장 — Ollama 로컬 LLM과 임베딩 모델 (HTML)](docs/ch04_ollama_local_llm_embedding_v01.html)
+- [제05장 — 메모리 벡터 검색 (HTML)](docs/ch05_memory_vector_search_v01.html)
+- [제06장 — PostgreSQL·pgvector 영속 벡터 검색 (HTML)](docs/ch06_postgresql_pgvector_v01.html)
+- [제07장 — Elasticsearch 기초 및 인덱스 (HTML)](docs/ch07_elasticsearch_basics_v01.html)
+- [제08장 — Elasticsearch 벡터·하이브리드 검색 (HTML)](docs/ch08_elasticsearch_vector_hybrid_v01.html)
+- [제09장 — RAG 문서 적재·분할·메타데이터 (HTML)](docs/ch09_document_ingestion_v01.html)
+- [제10장 — Spring AI 문서 검색 및 답변 생성 (HTML)](docs/ch10_spring_ai_rag_v01.html)
+- [제11장 — PDF 기반 RAG 구현 (HTML)](docs/ch11_pdf_rag_v01.html)
+- [제12장 — ERP 및 도메인 문서 RAG (HTML)](docs/ch12_erp_domain_rag_v01.html)
+- [제13장 — 검색 평가·출처 검증·성능 개선 (HTML)](docs/ch13_search_evaluation_v01.html)
+- [제14장 — LlamaIndex(Python)와 Spring AI 비교 (HTML)](docs/ch14_llamaindex_spring_ai_v01.html)
+- [제15장 — 통합 RAG 서비스 구축 및 배포 (HTML)](docs/ch15_integrated_rag_v01.html)
 
 ## 과정 목차
 
@@ -53,3 +55,20 @@ Ubuntu 24.04 LTS에서 **IntelliJ IDEA + Java 21 + Spring Boot / Spring AI**를 
 - 비밀번호·API 키·토큰·개인 경로·자료 원본을 공개 저장소에 올리지 않음
 
 공식 문서: [Spring AI](https://docs.spring.io/spring-ai/reference/) · [IntelliJ IDEA](https://www.jetbrains.com/help/idea/installation-guide.html) · [Ollama](https://ollama.com/download/linux) · [Docker Ubuntu](https://docs.docker.com/engine/install/ubuntu/) · [Elasticsearch](https://www.elastic.co/guide/en/elasticsearch/reference/current/index.html)
+
+## 📘 교육용 HTML 공통 제작 규칙
+
+이 저장소의 교육자료(웹페이지·강의 HTML)는 [Yuul-Jung 교육용 HTML 공통 표준](https://github.com/Yuul-Jung/rule_md/tree/main/web/education-html)을 적용합니다.
+
+- [제작 규칙](https://github.com/Yuul-Jung/rule_md/blob/main/web/education-html/STANDARD.md)
+- [다른 저장소 적용 안내](https://github.com/Yuul-Jung/rule_md/blob/main/web/education-html/INTEGRATION.md)
+- [기준 디자인 사례](https://github.com/Yuul-Jung/ai-agent-engineering)
+
+공통 책장 이미지, 컴팩트한 상단 배너, 좌측 전체 장/절 탐색, 모바일 메뉴, 파일 버전 및 검증 기준을 따릅니다.
+
+```bash
+# 사이트 다시 만들기 (Ubuntu)
+python3 -m venv .venv && source .venv/bin/activate   # 가상환경 준비
+python -m pip install mistune                        # Markdown 변환기 설치
+python build.py                                      # index.html · chNN_*_vNN.html 생성
+```
